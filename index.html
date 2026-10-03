@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Part Scanner</title>
+  <meta name="description" content="Scan choral sheet music and play your own part.">
+  <meta name="theme-color" content="#1f4e5f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <button id="back" class="icon-btn" hidden aria-label="Back">&larr;</button>
+    <h1>Part Scanner</h1>
+  </header>
+
+  <main>
+    <section id="home">
+      <div class="actions">
+        <button id="new-scan" class="primary">Scan music</button>
+        <label class="button">Open MusicXML<input id="open-xml" type="file" accept=".musicxml,.xml,application/vnd.recordare.musicxml+xml" multiple hidden></label>
+      </div>
+      <h2>Your scores</h2>
+      <ul id="library" class="library"></ul>
+      <p id="library-empty" class="muted">Nothing scanned yet. Photograph each page of a score, then pick the part you want to learn.</p>
+    </section>
+
+    <section id="scan" hidden>
+      <p class="muted">Add one photo per page, in order. Hold the phone square to the page in good light.</p>
+      <div class="actions">
+        <label class="button primary">Take photo<input id="camera" type="file" accept="image/*" capture="environment" hidden></label>
+        <label class="button">Add images<input id="gallery" type="file" accept="image/*" multiple hidden></label>
+      </div>
+      <ol id="pages" class="pages"></ol>
+      <button id="recognise" class="primary wide" disabled>Read music</button>
+      <div id="status" class="status" aria-live="polite"></div>
+    </section>
+
+    <section id="practice" hidden>
+      <input id="title" class="title-input" aria-label="Score title">
+
+      <h2>Your part</h2>
+      <ul id="lines" class="lines"></ul>
+
+      <div class="controls">
+        <label><span>Other parts <output id="others-val"></output></span>
+          <input id="others" type="range" min="0" max="100" value="25">
+        </label>
+        <label><span>Tempo <output id="tempo-val"></output> &#9833;/min</span>
+          <input id="tempo" type="range" min="30" max="180" value="80">
+        </label>
+        <div class="bars">
+          <label>From bar <input id="from-bar" type="number" min="1" value="1" inputmode="numeric"></label>
+          <label>to <input id="to-bar" type="number" min="1" inputmode="numeric"></label>
+          <label class="check"><input id="loop" type="checkbox"> Loop</label>
+        </div>
+      </div>
+
+      <div class="transport">
+        <button id="play" class="primary play">Play</button>
+        <div id="position" class="position">Bar 1</div>
+      </div>
+
+      <details id="score-view">
+        <summary>Show what was read</summary>
+        <p class="muted">Check this against your copy. Wrong notes here are recognition errors.</p>
+        <div id="osmd"></div>
+      </details>
+      <button id="delete" class="danger">Delete score</button>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

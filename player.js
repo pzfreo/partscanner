@@ -1,0 +1,131 @@
+// Web Audio playback of score lines with per-line volume.
+
+const LOOKAHEAD = 0.25; // seconds scheduled ahead
+const TICK_MS = 50;
+
+const midiToHz = (m) => 440 * 2 ** ((m - 69) / 12);
+
+export class Player {
+  constructor(score) {
+    this.score = score;
+    this.bpm = 80;
+    this.gains = score.lines.map(() => 1);
+    this.ctx = null;
+    this.playing = false;
+    this.onPosition = null;
+    this.onEnd = null;
+  }
+
+  ensureContext() {
+    if (this.ctx) return;
+    this.ctx = new AudioContext();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.8;
+    const comp = this.ctx.createDynamicsCompressor();
+    this.master.connect(comp).connect(this.ctx.destination);
+    this.lineNodes = this.score.lines.map((_, i) => {
+      const g = this.ctx.createGain();
+      g.gain.value = this.gains[i];
+      g.connect(this.master);
+      return g;
+    });
+  }
+
+  setGain(lineId, value) {
+    this.gains[lineId] = value;
+    if (this.ctx) this.lineNodes[lineId].gain.setTargetAtTime(value, this.ctx.currentTime, 0.02);
+  }
+
+  setTempo(bpm) {
+    const pos = this.playing ? this.position() : null;
+    this.bpm = bpm;
+    if (pos != null) this.play(pos, this.loopEnd, this.loop, this.loopStart);
+  }
+
+  // Current position in quarter notes.
+  position() {
+    if (!this.playing) return this.startBeat ?? 0;
+    return this.startBeat + ((this.ctx.currentTime - this.startTime) * this.bpm) / 60;
+  }
+
+  play(fromBeat = 0, toBeat = this.score.length, loop = false, loopStart = fromBeat) {
+    this.ensureContext();
+    this.stop(false);
+    this.ctx.resume();
+    this.playing = true;
+    this.loop = loop;
+    this.loopStart = loopStart;
+    this.loopEnd = toBeat;
+    this.startBeat = fromBeat;
+    this.startTime = this.ctx.currentTime + 0.1;
+    this.scheduledUntil = fromBeat;
+    this.timer = setInterval(() => this.schedule(), TICK_MS);
+    this.schedule();
+    const frame = () => {
+      if (!this.playing) return;
+      this.onPosition?.(this.position());
+      this.raf = requestAnimationFrame(frame);
+    };
+    frame();
+  }
+
+  stop(notify = true) {
+    if (!this.playing) return;
+    this.playing = false;
+    clearInterval(this.timer);
+    cancelAnimationFrame(this.raf);
+    for (const o of this.active ?? []) o.stop();
+    this.active = [];
+    if (notify) this.onEnd?.();
+  }
+
+  schedule() {
+    const secPerBeat = 60 / this.bpm;
+    const horizon = this.startBeat + (this.ctx.currentTime + LOOKAHEAD - this.startTime) / secPerBeat;
+    const from = this.scheduledUntil;
+    const to = Math.min(horizon, this.loopEnd);
+    if (to > from) {
+      this.score.lines.forEach((line, i) => {
+        for (const n of line.notes) {
+          if (n.t >= from && n.t < to) {
+            const dur = Math.min(n.dur, this.loopEnd - n.t);
+            this.note(i, n.midi, this.startTime + (n.t - this.startBeat) * secPerBeat, dur * secPerBeat);
+          }
+        }
+      });
+      this.scheduledUntil = to;
+    }
+    if (horizon >= this.loopEnd) {
+      if (this.loop) {
+        // Restart the timeline so the loop start lands exactly at the loop end.
+        this.startTime += (this.loopEnd - this.startBeat) * secPerBeat;
+        this.startBeat = this.loopStart;
+        this.scheduledUntil = this.loopStart;
+      } else if (this.ctx.currentTime > this.startTime + (this.loopEnd - this.startBeat) * secPerBeat) {
+        this.stop();
+      }
+    }
+  }
+
+  note(lineId, midi, when, duration) {
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = midiToHz(midi);
+    const env = ctx.createGain();
+    const end = when + Math.max(0.05, duration - 0.03);
+    env.gain.setValueAtTime(0, when);
+    env.gain.linearRampToValueAtTime(0.25, when + 0.015);
+    env.gain.setTargetAtTime(0.18, when + 0.015, 0.1);
+    env.gain.setTargetAtTime(0, end, 0.02);
+    osc.connect(env).connect(this.lineNodes[lineId]);
+    osc.start(when);
+    osc.stop(end + 0.15);
+    this.active ??= [];
+    this.active.push(osc);
+    osc.onended = () => {
+      const i = this.active.indexOf(osc);
+      if (i >= 0) this.active.splice(i, 1);
+    };
+  }
+}

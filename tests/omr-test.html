@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>OMR test</title>
+<pre id="log"></pre>
+<script>
+const log = (s) => { console.log(s); document.getElementById("log").textContent += s + "\n"; };
+const w = new Worker("../omr-worker.js", { type: "module" });
+const page = "../testdata/" + (new URLSearchParams(location.search).get("page") || "huron_1.png");
+window.result = null;
+w.onmessage = async ({ data }) => {
+  if (data.type === "progress" && data.stage === "download") return;
+  log(JSON.stringify(data).slice(0, 300));
+  if (data.type === "ready") {
+    const img = await (await fetch(page)).arrayBuffer();
+    w.postMessage({ type: "recognise", id: 1, image: img }, [img]);
+  }
+  if (data.type === "result") window.result = data;
+};
+w.onerror = (e) => log("WORKER ERROR " + e.message + " " + e.filename + ":" + e.lineno);
+log("starting");
+w.postMessage({ type: "init" });
+</script>

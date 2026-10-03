@@ -1,0 +1,4 @@
+vendor/
+models/
+testdata/
+.DS_Store
