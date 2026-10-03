@@ -25,6 +25,10 @@ then *Add to Home screen*.
   some pages doesn't break the merge. Each staff is split into an upper and a
   lower line by note onset (homr's voice numbers aren't reliable).
 - **Playback** (`player.js`): Web Audio, per-part volume, tempo, bar range, loop.
+- **Follow along**: homr records where each note sits in the photo
+  (`<!-- imgpos -->` comments), so playback highlights the current bar on your
+  own pages, with a playhead and a marker on your part's note, and auto-scrolls.
+  Tap a bar to start from there.
 - **Library** (`db.js`): each score is saved on the device in IndexedDB with
   its original photos, the recognised MusicXML and your settings (part, tempo,
   mix), so it opens instantly without re-reading. MusicXML files can be opened
@@ -49,6 +53,7 @@ node scripts/headless-test.mjs "http://localhost:8765/tests/score-test.html" out
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 600 tests/drive-app.js shot
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 600 tests/drive-offline.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-library.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-follow.js shot
 ```
 
 ## Deploy

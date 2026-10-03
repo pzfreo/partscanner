@@ -50,8 +50,8 @@ ws.onmessage = ({ data }) => {
       spawn("sh", ["-c", text.slice(9)]).on("exit", (code) => console.log("exec exit", code));
       return;
     }
-    if (text === "__SHOT__") {
-      send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true }).then((r) => {
+    if (text === "__SHOT__" || text === "__SHOTVIEW__") {
+      send("Page.captureScreenshot", { format: "png", captureBeyondViewport: text === "__SHOT__" }).then((r) => {
         const file = `${shotPrefix}-${++shots}.png`;
         writeFileSync(file, Buffer.from(r.data, "base64"));
         console.log("screenshot", file);
@@ -74,7 +74,7 @@ if (driveFile) {
   const { readFileSync } = await import("node:fs");
   const code = readFileSync(driveFile, "utf8");
   send("Runtime.evaluate", {
-    expression: `window.shot = () => new Promise(r => { window.__shotDone = r; console.log("__SHOT__"); }); (async () => { ${code} })().catch(e => { window.result = { error: String(e.stack || e) }; });`,
+    expression: `window.shot = (full = true) => new Promise(r => { window.__shotDone = r; console.log(full ? "__SHOT__" : "__SHOTVIEW__"); }); (async () => { ${code} })().catch(e => { window.result = { error: String(e.stack || e) }; });`,
   });
 }
 

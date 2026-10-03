@@ -237,7 +237,10 @@ function openScore(entry) {
   score = buildScore(entry.pages.map(parsePage));
   player?.stop();
   player = new Player(score);
-  player.onPosition = (beat) => ($("position").textContent = `Bar ${barAt(beat).number}`);
+  player.onPosition = (beat) => {
+    $("position").textContent = `Bar ${barAt(beat).number}`;
+    follow(beat);
+  };
   player.onEnd = () => ($("play").textContent = "Play");
 
   $("title").value = entry.title;
@@ -257,11 +260,131 @@ function openScore(entry) {
   $("play").textContent = "Play";
   $("score-view").open = false;
   $("osmd").replaceChildren();
-  releasePhotos("practice");
-  $("photos").hidden = !entry.images?.length;
-  $("photos").open = false;
-  $("photo-list").replaceChildren();
   show("practice");
+  renderFollow();
+}
+
+// ---------- following along on the photos ----------
+
+const SVG = "http://www.w3.org/2000/svg";
+const MAX_SIDE = 4200; // must match normalise(): homr's coordinates are in that space
+let pageViews = []; // per page: { svg, bar, playhead, note, w, h }
+let followedBar = null;
+
+function svgEl(tag, cls) {
+  const el = document.createElementNS(SVG, tag);
+  el.setAttribute("class", cls);
+  el.style.display = "none";
+  return el;
+}
+
+function renderFollow() {
+  releasePhotos("practice");
+  followedBar = null;
+  pageViews = [];
+  const images = current.images ?? [];
+  $("follow").hidden = !images.length || !score.measures.some((m) => m.box);
+  $("photo-list").replaceChildren(
+    ...images.map((blob, p) => {
+      const div = document.createElement("div");
+      div.className = "page";
+      const img = document.createElement("img");
+      img.alt = `Page ${p + 1}`;
+      img.src = photoUrl("practice", blob);
+      const svg = document.createElementNS(SVG, "svg");
+      svg.setAttribute("preserveAspectRatio", "none");
+      const view = { svg, bar: svgEl("rect", "bar"), playhead: svgEl("line", "playhead"), note: svgEl("circle", "note") };
+      svg.append(view.bar, view.playhead, view.note);
+      img.onload = () => {
+        const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+        view.w = img.naturalWidth * scale;
+        view.h = img.naturalHeight * scale;
+        svg.setAttribute("viewBox", `0 0 ${view.w} ${view.h}`);
+        if (p === 0) showBar(barRange()[0]);
+      };
+      svg.onclick = (e) => pickBar(p, e);
+      pageViews.push(view);
+      div.append(img, svg);
+      return div;
+    }),
+  );
+}
+
+function padded(box, view) {
+  const px = view.w * 0.015;
+  const py = view.h * 0.025;
+  return { x: box.x0 - px, y: box.y0 - py, w: box.x1 - box.x0 + 2 * px, h: box.y1 - box.y0 + 2 * py };
+}
+
+function showEl(el, attrs) {
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  el.style.display = "";
+}
+const hide = (el) => (el.style.display = "none");
+
+// Highlights the bar at `beat`; while playing also moves the playhead and
+// marks the note your part is singing.
+function follow(beat, playing = true) {
+  const bar = barAt(beat);
+  if (!bar.box) return;
+  const view = pageViews[bar.page];
+  if (!view?.w) return;
+  if (bar !== followedBar) {
+    for (const v of pageViews) [v.bar, v.playhead, v.note].forEach(hide);
+    const r = padded(bar.box, view);
+    showEl(view.bar, { x: r.x, y: r.y, width: r.w, height: r.h, rx: view.w * 0.006 });
+    followedBar = bar;
+    if (playing) keepInView(view.bar);
+  }
+  if (!playing) return;
+
+  const r = padded(bar.box, view);
+  const onsets = bar.onsets;
+  const i = onsets.findLastIndex((o) => o.t <= beat + 1e-6);
+  const from = i >= 0 ? onsets[i] : { t: bar.start, x: r.x };
+  const to = onsets[i + 1] ?? { t: bar.start + bar.length, x: r.x + r.w };
+  const x = from.x + ((to.x - from.x) * (beat - from.t)) / Math.max(1e-6, to.t - from.t);
+  showEl(view.playhead, { x1: x, x2: x, y1: r.y, y2: r.y + r.h });
+
+  const note = score.lines[current.mine].notes.find((n) => n.t <= beat + 1e-6 && beat < n.t + n.dur);
+  if (note?.pos && note.pos.page === bar.page) {
+    showEl(view.note, { cx: note.pos.x, cy: note.pos.y, r: view.w * 0.011 });
+  } else hide(view.note);
+}
+
+function showBar(beat) {
+  followedBar = null;
+  follow(beat, false);
+}
+
+function keepInView(el) {
+  const r = el.getBoundingClientRect();
+  const top = document.querySelector("header").offsetHeight;
+  const bottom = window.innerHeight - document.querySelector(".transport").offsetHeight;
+  if (r.top >= top && r.bottom <= bottom) return;
+  window.scrollBy({ top: r.top - top - Math.max(0, (bottom - top - r.height) / 3), behavior: "smooth" });
+}
+
+// Tap a bar on a photo to start from it.
+function pickBar(page, e) {
+  const view = pageViews[page];
+  const rect = view.svg.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * view.w;
+  const y = ((e.clientY - rect.top) / rect.height) * view.h;
+  let best = null;
+  let bestDist = Infinity;
+  for (const bar of score.measures) {
+    if (bar.page !== page || !bar.box) continue;
+    const r = padded(bar.box, view);
+    const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
+    const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) [best, bestDist] = [bar, d];
+  }
+  if (!best) return;
+  $("from-bar").value = best.number;
+  if (Number($("to-bar").value) < best.number) $("to-bar").value = score.measures.length;
+  $("from-bar").onchange();
 }
 
 function barAt(beat) {
@@ -356,9 +479,12 @@ $("play").onclick = () => {
 };
 for (const id of ["from-bar", "to-bar", "loop"]) {
   $(id).onchange = () => {
-    if (!player.playing) return;
     const [from, to] = barRange();
-    player.play(from, to, $("loop").checked);
+    if (player.playing) player.play(from, to, $("loop").checked);
+    else {
+      showBar(from);
+      $("position").textContent = `Bar ${barAt(from).number}`;
+    }
   };
 }
 
@@ -375,20 +501,6 @@ $("delete").onclick = () => {
   $("delete").dataset.confirm = "";
   $("delete").textContent = "Delete score";
   db.remove(current.id).finally(() => show("home"));
-};
-
-$("photos").ontoggle = () => {
-  if (!$("photos").open || $("photo-list").childElementCount) return;
-  $("photo-list").replaceChildren(
-    ...current.images.map((blob, i) => {
-      const a = document.createElement("a");
-      a.href = photoUrl("practice", blob);
-      a.target = "_blank";
-      a.innerHTML = `<img alt="Page ${i + 1}">`;
-      a.firstChild.src = a.href;
-      return a;
-    }),
-  );
 };
 
 // Rendering is only for checking recognition, so load OSMD on demand.

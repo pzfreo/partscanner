@@ -8,6 +8,15 @@ function num(el, tag, fallback = 0) {
   return v == null ? fallback : Number(v);
 }
 
+// homr writes each note's position in the input photo as a comment.
+function imagePosition(note) {
+  for (const c of note.childNodes) {
+    const m = c.nodeType === Node.COMMENT_NODE && /imgpos:\s*(-?\d+),\s*(-?\d+)/.exec(c.data);
+    if (m) return { x: Number(m[1]), y: Number(m[2]) };
+  }
+  return null;
+}
+
 export function parsePage(xmlText) {
   const doc = new DOMParser().parseFromString(xmlText, "application/xml");
   if (doc.querySelector("parsererror")) throw new Error("Not valid MusicXML");
@@ -51,6 +60,7 @@ export function parsePage(xmlText) {
               : null,
             tieStart: !!el.querySelector('tie[type="start"]'),
             tieStop: !!el.querySelector('tie[type="stop"]'),
+            pos: imagePosition(el),
           });
         }
         maxPos = Math.max(maxPos, pos);
@@ -157,6 +167,35 @@ export function buildScore(pages) {
     }
   }
 
+  // Where each bar sits on its photo: a box around its notes, and the x of
+  // each onset so a playhead can move through it.
+  pages.forEach((page, p) => {
+    for (const part of page.parts) {
+      part.measures.forEach((m, i) => {
+        const bar = measures[pageMeasureStart[p] + i];
+        for (const n of m.notes) {
+          if (!n.pos) continue;
+          const { x, y } = n.pos;
+          bar.page = p;
+          bar.box ??= { x0: x, y0: y, x1: x, y1: y };
+          bar.box.x0 = Math.min(bar.box.x0, x);
+          bar.box.y0 = Math.min(bar.box.y0, y);
+          bar.box.x1 = Math.max(bar.box.x1, x);
+          bar.box.y1 = Math.max(bar.box.y1, y);
+          bar.onsetXs ??= new Map();
+          bar.onsetXs.set(n.start, [...(bar.onsetXs.get(n.start) ?? []), x]);
+        }
+      });
+    }
+  });
+  for (const bar of measures) {
+    if (!bar.onsetXs) continue;
+    bar.onsets = [...bar.onsetXs]
+      .map(([start, xs]) => ({ t: bar.start + start, x: xs.reduce((a, b) => a + b, 0) / xs.length }))
+      .sort((a, b) => a.t - b.t);
+    delete bar.onsetXs;
+  }
+
   const orderedParts = [...partInfo.values()].sort(
     (a, b) => a.order.reduce((s, x) => s + x, 0) / a.order.length - b.order.reduce((s, x) => s + x, 0) / b.order.length,
   );
@@ -173,7 +212,14 @@ export function buildScore(pages) {
         part.measures.forEach((m, i) => {
           const offset = measures[pageMeasureStart[p] + i].start;
           const split = splitStaff(m.notes.filter((n) => n.staff === staff));
-          const place = (n) => ({ t: offset + n.start, dur: n.dur, midi: n.midi, tieStart: n.tieStart, tieStop: n.tieStop });
+          const place = (n) => ({
+            t: offset + n.start,
+            dur: n.dur,
+            midi: n.midi,
+            tieStart: n.tieStart,
+            tieStop: n.tieStop,
+            pos: n.pos && { page: p, ...n.pos },
+          });
           high.push(...split.high.map(place));
           low.push(...split.low.map(place));
         });

@@ -161,7 +161,14 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .position { font-variant-numeric: tabular-nums; font-size: 1.1rem; }
 
 details { margin-top: 24px; }
+.follow { margin-top: 24px; }
 .photo-list { display: grid; gap: 8px; }
+.photo-list .page { position: relative; }
 .photo-list img { width: 100%; display: block; border-radius: 8px; border: 1px solid var(--border); }
+.photo-list svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+.photo-list .bar { fill: var(--accent); fill-opacity: 0.12; stroke: var(--accent); stroke-width: 6; }
+.photo-list .playhead { stroke: #e0902a; stroke-width: 8; stroke-linecap: round; }
+.photo-list .note { fill: none; stroke: #e0902a; stroke-width: 7; }
+.danger { margin-bottom: 24px; }
 summary { cursor: pointer; min-height: 32px; }
 #osmd { background: #fff; border-radius: 8px; overflow-x: auto; }
