@@ -89,6 +89,10 @@ button:disabled { opacity: 0.45; cursor: default; }
   margin-bottom: 8px;
   text-align: left;
 }
+.library li button { gap: 12px; justify-content: flex-start; padding-left: 8px; }
+.library .name { flex: 1; }
+.library .thumb { width: 36px; height: 48px; flex: none; border-radius: 4px; overflow: hidden; background: var(--border); }
+.library .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .library small { color: var(--muted); font-weight: 400; }
 
 .pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; padding: 0; margin: 16px 0 0; list-style: none; }
@@ -152,5 +156,7 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .position { font-variant-numeric: tabular-nums; font-size: 1.1rem; }
 
 details { margin-top: 24px; }
+.photo-list { display: grid; gap: 8px; }
+.photo-list img { width: 100%; display: block; border-radius: 8px; border: 1px solid var(--border); }
 summary { cursor: pointer; min-height: 32px; }
 #osmd { background: #fff; border-radius: 8px; overflow-x: auto; }

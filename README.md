@@ -25,7 +25,9 @@ then *Add to Home screen*.
   some pages doesn't break the merge. Each staff is split into an upper and a
   lower line by note onset (homr's voice numbers aren't reliable).
 - **Playback** (`player.js`): Web Audio, per-part volume, tempo, bar range, loop.
-- Scores are kept on the device (localStorage). MusicXML files can be opened
+- **Library** (`db.js`): each score is saved on the device in IndexedDB with
+  its original photos, the recognised MusicXML and your settings (part, tempo,
+  mix), so it opens instantly without re-reading. MusicXML files can be opened
   directly, too.
 
 ## Develop
@@ -46,6 +48,7 @@ node scripts/headless-test.mjs "http://localhost:8765/tests/omr-test.html?page=h
 node scripts/headless-test.mjs "http://localhost:8765/tests/score-test.html" out.json 30
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 600 tests/drive-app.js shot
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 600 tests/drive-offline.js shot
+node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-library.js shot
 ```
 
 ## Deploy

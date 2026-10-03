@@ -1,36 +1,26 @@
 import { buildScore, parsePage } from "./score.js";
 import { Player } from "./player.js";
+import * as db from "./db.js";
 
 const $ = (id) => document.getElementById(id);
 const OSMD_URL = "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.0/build/opensheetmusicdisplay.min.js";
-const LIBRARY_KEY = "partscanner.library.v1";
 const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const noteName = (m) => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
 
-// ---------- library (per-device, in localStorage) ----------
+// ---------- library (per-device, in IndexedDB; see db.js) ----------
 
-function loadLibrary() {
-  try {
-    return JSON.parse(localStorage.getItem(LIBRARY_KEY)) ?? [];
-  } catch {
-    return [];
-  }
+const updateEntry = (id, changes) => db.update(id, changes).catch((e) => console.error("save failed", e));
+
+// Object URLs for photos currently on screen, released when re-rendered.
+const photoUrls = { library: [], practice: [] };
+function photoUrl(group, blob) {
+  const url = URL.createObjectURL(blob);
+  photoUrls[group].push(url);
+  return url;
 }
-function saveLibrary(lib) {
-  try {
-    localStorage.setItem(LIBRARY_KEY, JSON.stringify(lib));
-    return true;
-  } catch {
-    return false;
-  }
-}
-function updateEntry(id, changes) {
-  const lib = loadLibrary();
-  const entry = lib.find((e) => e.id === id);
-  if (entry) {
-    Object.assign(entry, changes);
-    saveLibrary(lib);
-  }
+function releasePhotos(group) {
+  photoUrls[group].forEach((u) => URL.revokeObjectURL(u));
+  photoUrls[group] = [];
 }
 
 // ---------- navigation ----------
@@ -39,14 +29,19 @@ const screens = ["home", "scan", "practice"];
 function show(name) {
   for (const s of screens) $(s).hidden = s !== name;
   $("back").hidden = name === "home";
-  if (name !== "practice") player?.stop();
+  if (name !== "practice") {
+    player?.stop();
+    releasePhotos("practice");
+    $("photo-list").replaceChildren();
+  }
   if (name === "home") renderLibrary();
   window.scrollTo(0, 0);
 }
 $("back").onclick = () => show("home");
 
-function renderLibrary() {
-  const lib = loadLibrary();
+async function renderLibrary() {
+  const lib = await db.all().catch(() => []);
+  releasePhotos("library");
   $("library-empty").hidden = lib.length > 0;
   $("library").replaceChildren(
     ...lib
@@ -55,8 +50,14 @@ function renderLibrary() {
       .map((entry) => {
         const li = document.createElement("li");
         const b = document.createElement("button");
-        b.innerHTML = `<span></span><small>${entry.pages.length} page${entry.pages.length > 1 ? "s" : ""}</small>`;
-        b.firstChild.textContent = entry.title;
+        b.innerHTML = `<span class="thumb"></span><span class="name"></span><small>${entry.pages.length} page${entry.pages.length > 1 ? "s" : ""}</small>`;
+        b.querySelector(".name").textContent = entry.title;
+        if (entry.images?.length) {
+          const img = document.createElement("img");
+          img.alt = "";
+          img.src = photoUrl("library", entry.images[0]);
+          b.querySelector(".thumb").append(img);
+        }
         b.onclick = () => openScore(entry);
         li.append(b);
         return li;
@@ -198,10 +199,13 @@ $("recognise").onclick = async () => {
     title: `Scan ${new Date().toLocaleDateString()}`,
     created: Date.now(),
     pages: xmls,
+    images: pages.map((p) => p.blob),
   };
-  const lib = loadLibrary();
-  lib.push(entry);
-  if (!saveLibrary(lib)) setPageStatus("Read OK, but the phone's storage is full so it won't be kept.");
+  try {
+    await db.put(entry);
+  } catch (e) {
+    setPageStatus(`Read OK, but couldn't save it on this phone (${e?.name || e}).`);
+  }
   openScore(entry);
 };
 
@@ -212,10 +216,8 @@ $("open-xml").onchange = async (e) => {
   try {
     const xmls = await Promise.all(files.map((f) => f.text()));
     const title = parsePage(xmls[0]).title || files[0].name.replace(/\.(musicxml|xml)$/i, "");
-    const entry = { id: crypto.randomUUID(), title, created: Date.now(), pages: xmls };
-    const lib = loadLibrary();
-    lib.push(entry);
-    saveLibrary(lib);
+    const entry = { id: crypto.randomUUID(), title, created: Date.now(), pages: xmls, images: [] };
+    await db.put(entry);
     openScore(entry);
   } catch (err) {
     $("library-empty").hidden = false;
@@ -254,6 +256,10 @@ function openScore(entry) {
   $("play").textContent = "Play";
   $("score-view").open = false;
   $("osmd").replaceChildren();
+  releasePhotos("practice");
+  $("photos").hidden = !entry.images?.length;
+  $("photos").open = false;
+  $("photo-list").replaceChildren();
   show("practice");
 }
 
@@ -363,8 +369,21 @@ $("delete").onclick = () => {
   }
   $("delete").dataset.confirm = "";
   $("delete").textContent = "Delete score";
-  saveLibrary(loadLibrary().filter((e) => e.id !== current.id));
-  show("home");
+  db.remove(current.id).finally(() => show("home"));
+};
+
+$("photos").ontoggle = () => {
+  if (!$("photos").open || $("photo-list").childElementCount) return;
+  $("photo-list").replaceChildren(
+    ...current.images.map((blob, i) => {
+      const a = document.createElement("a");
+      a.href = photoUrl("practice", blob);
+      a.target = "_blank";
+      a.innerHTML = `<img alt="Page ${i + 1}">`;
+      a.firstChild.src = a.href;
+      return a;
+    }),
+  );
 };
 
 // Rendering is only for checking recognition, so load OSMD on demand.
