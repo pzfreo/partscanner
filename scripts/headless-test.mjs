@@ -17,6 +17,7 @@ const chrome = spawn(CHROME, [
   `--user-data-dir=${mkdtempSync(join(tmpdir(), "chrome-"))}`,
   "--enable-unsafe-webgpu",
   "--autoplay-policy=no-user-gesture-required",
+  ...(process.env.CHROME_FLAGS ? process.env.CHROME_FLAGS.split(" ") : []),
   "about:blank",
 ]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

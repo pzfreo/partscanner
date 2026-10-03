@@ -80,9 +80,7 @@ function startWorker() {
       if (data.type === "progress" && data.stage === "download") {
         download.set(data.name, data);
         const loaded = [...download.values()].reduce((s, d) => s + d.loaded, 0);
-        const total = [...download.values()].reduce((s, d) => s + d.total, 0);
-        const of = [...download.values()].every((d) => d.total) ? ` / ${Math.round(total / 1e6)}` : "";
-        setEngineStatus(`Downloading music reader (once only): ${Math.round(loaded / 1e6)}${of} MB`);
+        setEngineStatus(`Downloading music reader (once only): ${Math.round(loaded / 1e6)} / ${Math.round(data.total / 1e6)} MB`);
       } else if (data.type === "progress" && data.stage === "python") {
         setEngineStatus("Starting music reader…");
       } else if (data.type === "ready") {

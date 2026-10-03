@@ -10,6 +10,9 @@ const MODELS = [
   "encoder_pytorch_model_465-597144cab54c8f6d0f6c9619df5c5312694eadd6.onnx",
   "decoder_pytorch_model_465-597144cab54c8f6d0f6c9619df5c5312694eadd6.onnx",
 ];
+// Uncompressed total, for progress: servers may gzip, so content-length
+// doesn't match the bytes received.
+const MODELS_TOTAL_BYTES = 157482318;
 // The decoder runs hundreds of tiny steps per staff, where WebGPU's per-call
 // overhead loses to WASM; the big convolutional models gain from the GPU.
 const GPU_MODELS = new Set([MODELS[0], MODELS[1]]);
@@ -30,7 +33,6 @@ async function fetchModel(name) {
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Model download failed: ${name} (${res.status})`);
-  const total = Number(res.headers.get("content-length")) || 0;
   const reader = res.body.getReader();
   const chunks = [];
   let loaded = 0;
@@ -39,7 +41,7 @@ async function fetchModel(name) {
     if (done) break;
     chunks.push(value);
     loaded += value.length;
-    post({ type: "progress", stage: "download", name, loaded, total });
+    post({ type: "progress", stage: "download", name, loaded, total: MODELS_TOTAL_BYTES });
   }
   const bytes = new Uint8Array(loaded);
   let offset = 0;
