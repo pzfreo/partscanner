@@ -241,7 +241,7 @@ function openScore(entry) {
     $("position").textContent = `Bar ${barAt(beat).number}`;
     follow(beat);
   };
-  player.onEnd = () => ($("play").textContent = "Play");
+  player.onEnd = () => setPlaying(false);
 
   $("title").value = entry.title;
   $("to-bar").value = score.measures.length;
@@ -257,7 +257,10 @@ function openScore(entry) {
   updateLabels();
   player.bpm = Number($("tempo").value);
   $("position").textContent = "Bar 1";
-  $("play").textContent = "Play";
+  setPlaying(false);
+  resumeAt = null;
+  // New scans (no part chosen yet) and photo-less scores start with settings open.
+  setPanel(entry.mine == null || !entry.images?.length);
   $("score-view").open = false;
   $("osmd").replaceChildren();
   show("practice");
@@ -360,7 +363,9 @@ function showBar(beat) {
 function keepInView(el) {
   const r = el.getBoundingClientRect();
   const top = document.querySelector("header").offsetHeight;
-  const bottom = window.innerHeight - document.querySelector(".transport").offsetHeight;
+  const bottom = $("panel").hidden
+    ? window.innerHeight - document.querySelector(".transport").offsetHeight
+    : $("panel").getBoundingClientRect().top;
   if (r.top >= top && r.bottom <= bottom) return;
   window.scrollBy({ top: r.top - top - Math.max(0, (bottom - top - r.height) / 3), behavior: "smooth" });
 }
@@ -468,17 +473,45 @@ function barRange() {
   return [score.measures[from - 1].start, last.start + last.length];
 }
 
+let resumeAt = null; // beat to continue from after a pause
+
+function setPlaying(on) {
+  $("play").classList.toggle("playing", on);
+  $("play").setAttribute("aria-label", on ? "Pause" : "Play");
+}
+
+function setPanel(open) {
+  $("panel").hidden = !open;
+  $("settings").setAttribute("aria-expanded", String(open));
+}
+$("settings").onclick = () => setPanel($("panel").hidden);
+
 $("play").onclick = () => {
   if (player.playing) {
+    resumeAt = player.position();
     player.stop();
     return;
   }
   const [from, to] = barRange();
-  player.play(from, to, $("loop").checked);
-  $("play").textContent = "Stop";
+  const start = resumeAt != null && resumeAt >= from && resumeAt < to ? resumeAt : from;
+  resumeAt = null;
+  player.play(start, to, $("loop").checked, from);
+  setPlaying(true);
 };
+
+$("rewind").onclick = () => {
+  resumeAt = null;
+  const [from, to] = barRange();
+  if (player.playing) player.play(from, to, $("loop").checked);
+  else {
+    showBar(from);
+    $("position").textContent = `Bar ${barAt(from).number}`;
+  }
+};
+
 for (const id of ["from-bar", "to-bar", "loop"]) {
   $(id).onchange = () => {
+    resumeAt = null;
     const [from, to] = barRange();
     if (player.playing) player.play(from, to, $("loop").checked);
     else {

@@ -43,39 +43,49 @@
     <section id="practice" hidden>
       <label class="title-wrap"><input id="title" class="title-input" aria-label="Score title (tap to rename)"><span aria-hidden="true">&#9998;</span></label>
 
-      <h2>Your part</h2>
-      <ul id="lines" class="lines"></ul>
-
-      <div class="controls">
-        <label><span>Other parts <output id="others-val"></output></span>
-          <input id="others" type="range" min="0" max="100" value="25">
-        </label>
-        <label><span>Tempo <output id="tempo-val"></output> &#9833;/min</span>
-          <input id="tempo" type="range" min="30" max="180" value="80">
-        </label>
-        <div class="bars">
-          <label>From bar <input id="from-bar" type="number" min="1" value="1" inputmode="numeric"></label>
-          <label>to <input id="to-bar" type="number" min="1" inputmode="numeric"></label>
-          <label class="check"><input id="loop" type="checkbox"> Loop</label>
-        </div>
-      </div>
-
       <div id="follow" class="follow" hidden>
         <p class="muted">Tap a bar to start from there.</p>
         <div id="photo-list" class="photo-list"></div>
       </div>
 
-      <details id="score-view">
-        <summary>Show what was read</summary>
-        <p class="muted">Check this against your copy. Wrong notes here are recognition errors.</p>
-        <div id="osmd"></div>
-      </details>
-      <button id="delete" class="danger">Delete score</button>
+      <div id="panel" class="panel" hidden>
+        <h2>Your part</h2>
+        <ul id="lines" class="lines"></ul>
 
-      <!-- Last in the section so it stays stuck to the bottom while scrolling the music. -->
+        <div class="controls">
+          <label><span>Other parts <output id="others-val"></output></span>
+            <input id="others" type="range" min="0" max="100" value="25">
+          </label>
+          <label><span>Tempo <output id="tempo-val"></output> &#9833;/min</span>
+            <input id="tempo" type="range" min="30" max="180" value="80">
+          </label>
+          <div class="bars">
+            <label>From bar <input id="from-bar" type="number" min="1" value="1" inputmode="numeric"></label>
+            <label>to <input id="to-bar" type="number" min="1" inputmode="numeric"></label>
+            <label class="check"><input id="loop" type="checkbox"> Loop</label>
+          </div>
+        </div>
+
+        <details id="score-view">
+          <summary>Show what was read</summary>
+          <p class="muted">Check this against your copy. Wrong notes here are recognition errors.</p>
+          <div id="osmd"></div>
+        </details>
+        <button id="delete" class="danger">Delete score</button>
+      </div>
+
       <div class="transport">
-        <button id="play" class="primary play">Play</button>
+        <button id="rewind" class="icon-round" aria-label="Back to start bar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM19 5v14L9 12z"/></svg>
+        </button>
+        <button id="play" class="icon-round primary" aria-label="Play">
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+        </button>
         <div id="position" class="position">Bar 1</div>
+        <button id="settings" class="icon-round" aria-label="Settings" aria-expanded="false" aria-controls="panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2.2" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="10" cy="17" r="2.2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+        </button>
       </div>
     </section>
   </main>
