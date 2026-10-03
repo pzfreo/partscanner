@@ -30,6 +30,14 @@ jobs:
           cp -r index.html app.js score.js player.js db.js styles.css omr-worker.js sw.js \
             manifest.webmanifest icon.svg icon-192.png icon-512.png omr models _site/
           cp vendor/homr.zip _site/vendor/
+      - name: Check every precached app file is in the site
+        run: |
+          node -e '
+            const fs = require("fs");
+            const files = [...fs.readFileSync("sw.js", "utf8").matchAll(/^\s+"([^"]+)",?$/gm)].map((m) => m[1]);
+            const missing = files.filter((f) => f !== "./" && !fs.existsSync("_site/" + f));
+            if (missing.length) { console.error("Missing from _site:", missing); process.exit(1); }
+            console.log("All", files.length, "precached files present");'
       - uses: actions/upload-pages-artifact@v3
       - id: deployment
         uses: actions/deploy-pages@v4
