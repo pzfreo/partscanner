@@ -27,7 +27,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site/vendor
-          cp -r index.html app.js score.js player.js styles.css omr-worker.js sw.js \
+          cp -r index.html app.js score.js player.js db.js styles.css omr-worker.js sw.js \
             manifest.webmanifest icon.svg icon-192.png icon-512.png omr models _site/
           cp vendor/homr.zip _site/vendor/
       - uses: actions/upload-pages-artifact@v3
