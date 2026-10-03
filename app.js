@@ -119,6 +119,7 @@ $("new-scan").onclick = () => {
   pages.forEach((p) => URL.revokeObjectURL(p.url));
   pages = [];
   pageStatus = "";
+  $("scan-name").value = "";
   renderPages();
   show("scan");
   startWorker();
@@ -196,7 +197,7 @@ $("recognise").onclick = async () => {
   }
   const entry = {
     id: crypto.randomUUID(),
-    title: `Scan ${new Date().toLocaleDateString()}`,
+    title: $("scan-name").value.trim() || `Scan ${new Date().toLocaleDateString()}`,
     created: Date.now(),
     pages: xmls,
     images: pages.map((p) => p.blob),
@@ -330,7 +331,11 @@ $("tempo").oninput = () => {
   player.setTempo(Number($("tempo").value));
 };
 $("tempo").onchange = () => updateEntry(current.id, { tempo: Number($("tempo").value) });
-$("title").onchange = () => updateEntry(current.id, { title: $("title").value.trim() || current.title });
+$("title").onchange = () => {
+  current.title = $("title").value.trim() || current.title;
+  $("title").value = current.title;
+  updateEntry(current.id, { title: current.title });
+};
 
 function barRange() {
   const n = score.measures.length;

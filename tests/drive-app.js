@@ -26,4 +26,4 @@ $("score-view").open = true;
 await waitFor(() => document.querySelectorAll("#osmd svg").length >= 4, 30000, "osmd render");
 await sleep(500);
 await shot();
-window.result = { secs, labels: [...document.querySelectorAll("#lines .pick span:first-of-type")].map((s) => s.textContent + " " + s.nextElementSibling.textContent), mine: document.querySelector("#lines li.mine .pick span").textContent, pos, svgs: document.querySelectorAll("#osmd svg").length, library: JSON.parse(localStorage.getItem("partscanner.library.v1")).length };
+window.result = { secs, labels: [...document.querySelectorAll("#lines .pick span:first-of-type")].map((s) => s.textContent + " " + s.nextElementSibling.textContent), mine: document.querySelector("#lines li.mine .pick span").textContent, pos, svgs: document.querySelectorAll("#osmd svg").length, library: await new Promise((res) => { const q = indexedDB.open("partscanner"); q.onsuccess = () => { const c = q.result.transaction("scores").objectStore("scores").count(); c.onsuccess = () => res(c.result); }; }) };
