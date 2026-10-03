@@ -6,6 +6,9 @@ line), and plays it back with your part loud and the others quiet.
 
 Everything runs on the phone. There is no server.
 
+**Use it:** https://pzfreo.github.io/partscanner/ — open in Chrome on Android,
+then *Add to Home screen*.
+
 ## How it works
 
 - **Recognition**: [homr](https://github.com/liebharc/homr) (optical music
