@@ -1,6 +1,7 @@
 import { buildScore, parsePage } from "./score.js";
 import { Player } from "./player.js";
 import * as db from "./db.js";
+import { rotateBlob, uprightPhoto } from "./orient.js";
 
 const $ = (id) => document.getElementById(id);
 const OSMD_URL = "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.0/build/opensheetmusicdisplay.min.js";
@@ -26,18 +27,35 @@ function releasePhotos(group) {
 // ---------- navigation ----------
 
 const screens = ["home", "scan", "practice"];
-function show(name) {
+// Each screen (and the open settings panel) is a history entry, so the phone's
+// back button steps back through the app instead of leaving it.
+// nav: "push" a new entry, "replace" the current one, or "none" (from popstate).
+function show(name, nav = "push") {
   for (const s of screens) $(s).hidden = s !== name;
   $("back").hidden = name === "home";
   if (name !== "practice") {
     player?.stop();
     releasePhotos("practice");
     $("photo-list").replaceChildren();
+    $("panel").hidden = true;
   }
   if (name === "home") renderLibrary();
+  if (name !== "home" && nav === "push") history.pushState({ screen: name }, "");
+  if (name !== "home" && nav === "replace") history.replaceState({ screen: name }, "");
   window.scrollTo(0, 0);
 }
-$("back").onclick = () => show("home");
+
+function goHome() {
+  const depth = history.state?.panel ? 2 : history.state?.screen ? 1 : 0;
+  if (depth) history.go(-depth);
+  else show("home", "none");
+}
+$("back").onclick = goHome;
+
+window.addEventListener("popstate", (e) => {
+  if (e.state?.screen === "practice" && !$("practice").hidden) setPanel(false, false);
+  else show("home", "none");
+});
 
 async function renderLibrary() {
   const lib = await db.all().catch(() => []);
@@ -125,16 +143,19 @@ $("new-scan").onclick = () => {
   startWorker();
 };
 
-function addFiles(files) {
-  for (const f of files) pages.push({ blob: f, url: URL.createObjectURL(f) });
-  renderPages();
+async function addFiles(files) {
+  for (const f of files) {
+    const blob = await uprightPhoto(f).catch(() => f);
+    pages.push({ blob, url: URL.createObjectURL(blob) });
+    renderPages();
+  }
 }
 $("camera").onchange = (e) => {
-  addFiles(e.target.files);
+  addFiles([...e.target.files]);
   e.target.value = "";
 };
 $("gallery").onchange = (e) => {
-  addFiles(e.target.files);
+  addFiles([...e.target.files]);
   e.target.value = "";
 };
 
@@ -142,9 +163,17 @@ function renderPages() {
   $("pages").replaceChildren(
     ...pages.map((p, i) => {
       const li = document.createElement("li");
-      li.innerHTML = `<img alt="Page ${i + 1}"><span class="num">${i + 1}</span><button class="remove" aria-label="Remove page ${i + 1}">&times;</button>`;
+      li.innerHTML = `<img alt="Page ${i + 1}"><span class="num">${i + 1}</span>
+        <button class="rotate" aria-label="Rotate page ${i + 1}">&#8635;</button>
+        <button class="remove" aria-label="Remove page ${i + 1}">&times;</button>`;
       li.querySelector("img").src = p.url;
-      li.querySelector("button").onclick = () => {
+      li.querySelector(".rotate").onclick = async () => {
+        p.blob = await rotateBlob(p.blob, 90);
+        URL.revokeObjectURL(p.url);
+        p.url = URL.createObjectURL(p.blob);
+        renderPages();
+      };
+      li.querySelector(".remove").onclick = () => {
         URL.revokeObjectURL(p.url);
         pages.splice(i, 1);
         renderPages();
@@ -207,7 +236,9 @@ $("recognise").onclick = async () => {
   } catch (e) {
     setPageStatus(`Read OK, but couldn't save it on this phone (${e?.name || e}).`);
   }
-  openScore(entry);
+  // If they've gone back to the library meanwhile, it's just added there.
+  if (!$("scan").hidden) openScore(entry, "replace");
+  else renderLibrary();
 };
 
 $("open-xml").onchange = async (e) => {
@@ -232,7 +263,8 @@ let player;
 let current; // library entry
 let score;
 
-function openScore(entry) {
+function openScore(entry, nav = "push") {
+  const partChosen = entry.mine != null; // read before defaults are filled in below
   current = entry;
   score = buildScore(entry.pages.map(parsePage));
   player?.stop();
@@ -259,11 +291,12 @@ function openScore(entry) {
   $("position").textContent = "Bar 1";
   setPlaying(false);
   resumeAt = null;
-  // New scans (no part chosen yet) and photo-less scores start with settings open.
-  setPanel(entry.mine == null || !entry.images?.length);
   $("score-view").open = false;
   $("osmd").replaceChildren();
-  show("practice");
+  show("practice", nav);
+  // New scans (no part chosen yet) and photo-less scores start with settings open.
+  $("panel").hidden = true;
+  setPanel(!partChosen || !entry.images?.length);
   renderFollow();
 }
 
@@ -480,9 +513,14 @@ function setPlaying(on) {
   $("play").setAttribute("aria-label", on ? "Pause" : "Play");
 }
 
-function setPanel(open) {
+// nav=false when responding to the back button (history already moved).
+function setPanel(open, nav = true) {
+  const wasOpen = !$("panel").hidden;
   $("panel").hidden = !open;
   $("settings").setAttribute("aria-expanded", String(open));
+  if (!nav || open === wasOpen) return;
+  if (open) history.pushState({ screen: "practice", panel: true }, "");
+  else if (history.state?.panel) history.back();
 }
 $("settings").onclick = () => setPanel($("panel").hidden);
 
@@ -533,7 +571,7 @@ $("delete").onclick = () => {
   }
   $("delete").dataset.confirm = "";
   $("delete").textContent = "Delete score";
-  db.remove(current.id).finally(() => show("home"));
+  db.remove(current.id).finally(goHome);
 };
 
 // Rendering is only for checking recognition, so load OSMD on demand.

@@ -10,6 +10,7 @@ async function scanIn(win) {
   const blob = await (await fetch("/testdata/huron_1.png")).blob();
   const dt = new win.DataTransfer(); dt.items.add(new win.File([blob], "p.png", { type: "image/png" }));
   $("gallery").files = dt.files; $("gallery").dispatchEvent(new win.Event("change"));
+  await waitFor(() => !$("recognise").disabled, 10000, "page added");
   $("recognise").click();
   await waitFor(() => !$("practice").hidden || /Couldn't/.test($("status").textContent), 300000, "recognition");
   return { status: $("status").textContent, lines: [...win.document.querySelectorAll("#lines .pick span:first-of-type")].map((s) => s.textContent) };

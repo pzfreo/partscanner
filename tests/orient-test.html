@@ -1,0 +1,27 @@
+<script type="module">
+// Simulated phone photos: sensor-layout pixels of each test page saved with
+// EXIF orientation 6 (portrait shot), 1 and 3 (phone flat, tag wrong).
+// uprightPhoto() must return an upright page in every case.
+import { uprightPhoto, isSideways } from "../orient.js";
+async function thumb(blob, turn180 = false) {
+  const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+  const c = new OffscreenCanvas(60, 84), ctx = c.getContext("2d");
+  if (turn180) { ctx.translate(60, 84); ctx.rotate(Math.PI); }
+  ctx.drawImage(bmp, 0, 0, 60, 84);
+  return { d: ctx.getImageData(0, 0, 60, 84).data, w: bmp.width, h: bmp.height };
+}
+const diff = (a, b) => { let s = 0; for (let i = 0; i < a.length; i += 4) s += Math.abs(a[i] - b[i]); return s; };
+const out = [];
+for (const i of [0, 1, 2, 3]) {
+  const ref = await thumb(await (await fetch(`../testdata/huron_${i}.png`)).blob());
+  for (const tag of [6, 1, 3]) {
+    const photo = await (await fetch(`../testdata/cam_${i}_exif${tag}.jpg`)).blob();
+    const fixed = await uprightPhoto(photo);
+    const t = await thumb(fixed), flipped = await thumb(fixed, true);
+    const bmp = await createImageBitmap(fixed, { imageOrientation: "from-image" });
+    const upright = !isSideways(bmp) && t.h > t.w && diff(t.d, ref.d) < diff(flipped.d, ref.d);
+    out.push({ page: i, tag, changed: fixed !== photo, upright });
+  }
+}
+window.result = { allOk: out.every((o) => o.upright), out };
+</script>

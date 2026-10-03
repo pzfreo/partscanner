@@ -11,6 +11,7 @@ const SHELL_FILES = [
   "score.js",
   "player.js",
   "db.js",
+  "orient.js",
   "styles.css",
   "omr-worker.js",
   "omr/onnxruntime.py",

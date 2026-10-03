@@ -26,6 +26,7 @@ app.$("new-scan").click();
 const blob = await (await fetch("/testdata/huron_1.png")).blob();
 const dt = new app.w.DataTransfer(); dt.items.add(new app.w.File([blob], "p.png", { type: "image/png" }));
 app.$("gallery").files = dt.files; app.$("gallery").dispatchEvent(new app.w.Event("change"));
+await waitFor(() => !app.$("recognise").disabled, 10000, "page added");
 app.$("scan-name").value = "Named at scan";
 app.$("recognise").click();
 await waitFor(() => !app.$("practice").hidden, 300000, "recognition");

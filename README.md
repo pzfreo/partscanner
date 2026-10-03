@@ -29,6 +29,12 @@ then *Add to Home screen*.
   (`<!-- imgpos -->` comments), so playback highlights the current bar on your
   own pages, with a playhead and a marker on your part's note, and auto-scrolls.
   Tap a bar to start from there.
+- **Photo orientation** (`orient.js`): phones held flat over a page often save
+  it sideways. Sideways pages are detected from the staff lines and turned the
+  way a portrait photo would have been (using the stored pixels' EXIF tag);
+  each thumbnail also has a ↻ button.
+- **Navigation**: screens and the settings panel are history entries, so the
+  phone's back button steps back through the app instead of closing it.
 - **Library** (`db.js`): each score is saved on the device in IndexedDB with
   its original photos, the recognised MusicXML and your settings (part, tempo,
   mix), so it opens instantly without re-reading. MusicXML files can be opened
@@ -45,7 +51,9 @@ The service worker is skipped on `localhost`; use `http://127.0.0.1:8765` to
 exercise it. A phone needs HTTPS (camera, caches), so test there via the deployed
 site.
 
-Headless browser tests (put score images/MusicXML in the gitignored `testdata/`):
+Headless browser tests (put score images/MusicXML in the gitignored `testdata/`;
+the orientation tests also need simulated camera photos `cam_<page>_exif<tag>.jpg`:
+each page's pixels turned 90° anticlockwise, saved with EXIF orientation 1, 3 or 6):
 
 ```sh
 node scripts/headless-test.mjs "http://localhost:8765/tests/omr-test.html?page=huron_1.png" out.json
@@ -54,6 +62,8 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 600 t
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 600 tests/drive-offline.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-library.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-follow.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 400 tests/drive-nav.js shot
+node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" out.json 100
 ```
 
 ## Deploy

@@ -99,6 +99,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .pages li { position: relative; }
 .pages img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; }
 .pages .remove { position: absolute; top: 4px; right: 4px; min-height: 28px; padding: 0 8px; font-size: 0.85rem; }
+.pages .rotate { position: absolute; top: 4px; left: 4px; min-height: 28px; padding: 0 8px; font-size: 1rem; }
 .pages .num { position: absolute; bottom: 4px; left: 4px; background: var(--surface); border-radius: 6px; padding: 0 6px; font-size: 0.8rem; }
 
 .name-field { display: grid; gap: 4px; margin-top: 16px; font-size: 0.95rem; }

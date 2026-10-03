@@ -27,8 +27,8 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site/vendor
-          cp -r index.html app.js score.js player.js db.js styles.css omr-worker.js sw.js \
-            manifest.webmanifest icon.svg icon-192.png icon-512.png omr models _site/
+          cp -r index.html *.js styles.css manifest.webmanifest icon.svg icon-192.png icon-512.png \
+            omr models _site/
           cp vendor/homr.zip _site/vendor/
       - name: Check every precached app file is in the site
         run: |
