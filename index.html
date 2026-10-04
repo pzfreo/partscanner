@@ -43,7 +43,13 @@
     </section>
 
     <section id="practice" hidden>
-      <label class="title-wrap"><input id="title" class="title-input" aria-label="Score title (tap to rename)"><span id="title-icon" aria-hidden="true">&#9998;</span></label>
+      <div class="title-row">
+        <label class="title-wrap"><input id="title" class="title-input" aria-label="Score title (tap to rename)"><span id="title-icon" aria-hidden="true">&#9998;</span></label>
+        <button id="share" class="share-btn" aria-label="Share this score" title="Share this score">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16.1c-.8 0-1.4.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7L16 7.2c.5.5 1.2.8 2 .8 1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3c0 .2 0 .5.1.7L8 8.8C7.5 8.3 6.8 8 6 8c-1.7 0-3 1.3-3 3s1.3 3 3 3c.8 0 1.5-.3 2-.8l7.1 4.2c-.1.2-.1.4-.1.6 0 1.6 1.3 2.9 2.9 2.9s2.9-1.3 2.9-2.9-1.3-2.9-2.9-2.9z"/></svg>
+        </button>
+      </div>
+      <p id="share-status" class="muted share-status" aria-live="polite"></p>
 
       <div id="follow" class="follow" hidden>
         <p id="tap-hint" class="muted">Tap a bar to start from there.</p>
@@ -95,10 +101,6 @@
           </div>
         </div>
 
-        <div class="share-row">
-          <button id="share">Share this score</button>
-          <span id="share-status" class="muted" aria-live="polite"></span>
-        </div>
         <button id="delete" class="danger">Delete score</button>
       </div>
 

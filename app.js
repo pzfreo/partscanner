@@ -410,6 +410,7 @@ $("share").onclick = async () => {
     $("share-status").textContent = `Couldn't share: ${e.message}`;
   } finally {
     $("share").disabled = false;
+    setTimeout(() => ($("share-status").textContent = ""), 4000);
   }
 };
 
@@ -461,6 +462,7 @@ function openScore(entry, nav = "push") {
   };
 
   $("title").value = entry.title;
+  $("share-status").textContent = "";
   $("to-bar").value = score.measures.length;
   $("from-bar").value = 1;
   $("from-bar").max = $("to-bar").max = score.measures.length;
