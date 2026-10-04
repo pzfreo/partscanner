@@ -75,6 +75,29 @@ window.addEventListener("popstate", (e) => {
   } else show("home", "none");
 });
 
+const DELETE_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+
+// Swaps a library row for a "are you sure?" check before deleting.
+function confirmDelete(li, entry) {
+  const box = document.createElement("div");
+  box.className = "confirm-delete";
+  box.setAttribute("role", "alertdialog");
+  box.innerHTML = `<p></p><div class="actions"><button class="danger-solid">Delete</button><button>Cancel</button></div>`;
+  box.querySelector("p").textContent = `Delete “${entry.title}”? This can't be undone.`;
+  const [yes, no] = box.querySelectorAll("button");
+  yes.onclick = async () => {
+    await db.remove(entry.id);
+    await renderLibrary();
+    $("library-status").textContent = `Deleted “${entry.title}”.`;
+    clearTimeout(shareScore.timer);
+    shareScore.timer = setTimeout(() => ($("library-status").textContent = ""), 4000);
+  };
+  no.onclick = () => renderLibrary();
+  li.replaceChildren(box);
+  no.focus();
+}
+
 const COPY_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
 
@@ -120,6 +143,15 @@ async function renderLibrary() {
         } else {
           for (let i = 0; i < 2; i++) li.append(Object.assign(document.createElement("span"), { className: "share-spacer" }));
         }
+        const del = document.createElement("button");
+        del.className = "share-btn delete-btn";
+        del.setAttribute("aria-label", `Delete ${entry.title}`);
+        del.title = entry.locked ? "Locked: unlock it to delete" : "Delete";
+        del.innerHTML = DELETE_ICON;
+        // Locked scores can't be deleted, nor the scan being read right now.
+        del.disabled = !!entry.locked || (reading && entry.id === scanId);
+        del.onclick = () => confirmDelete(li, entry);
+        li.append(del);
         return li;
       }),
   );

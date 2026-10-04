@@ -1,0 +1,34 @@
+// Deleting from the score list asks first; locked scores can't be deleted.
+// Run against http://localhost:8765/index.html.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const waitFor = async (fn, ms, label) => { const end = Date.now() + ms; while (Date.now() < end) { try { const v = await fn(); if (v) return v; } catch {} await sleep(100); } throw new Error("timeout waiting for " + label); };
+const $ = (id) => document.getElementById(id);
+const ids = () => new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onsuccess = () => { const g = q.result.transaction("scores").objectStore("scores").getAllKeys(); g.onsuccess = () => res(g.result.sort()); }; });
+const pages = [await (await fetch("/testdata/huron_0.musicxml")).text()];
+const images = [await (await fetch("/testdata/huron_0.png")).blob()];
+await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onupgradeneeded = () => q.result.createObjectStore("scores", { keyPath: "id" }); q.onsuccess = () => { const tx = q.result.transaction("scores", "readwrite"); const s = tx.objectStore("scores");
+  s.put({ id: "a", title: "Alpha", created: 3, pages, images });
+  s.put({ id: "b", title: "Bravo", created: 2, pages, images, locked: true });
+  s.put({ id: "c", title: "Charlie", created: 1, pages: [pages[0], null], images: [images[0], images[0]], pending: true, resumes: 2 });
+  tx.oncomplete = res; }; });
+$("new-scan").click(); history.back(); await sleep(400);
+await waitFor(() => document.querySelectorAll("#library li").length === 3, 5000, "library");
+const bin = (name) => document.querySelector(`#library button[aria-label="Delete ${name}"]`);
+const r = {};
+r.bins = { alpha: !!bin("Alpha") && !bin("Alpha").disabled, bravoLocked: bin("Bravo")?.disabled, charlie: !!bin("Charlie") && !bin("Charlie").disabled };
+bin("Alpha").click(); await sleep(100);
+r.confirmText = document.querySelector(".confirm-delete p").textContent;
+await shot(false);
+[...document.querySelectorAll(".confirm-delete button")].find((b) => b.textContent === "Cancel").click(); await sleep(200);
+r.cancelKeeps = (await ids()).join(",");
+r.rowBack = !!bin("Alpha");
+bin("Alpha").click(); await sleep(100);
+[...document.querySelectorAll(".confirm-delete button")].find((b) => b.textContent === "Delete").click();
+await waitFor(() => document.querySelectorAll("#library li").length === 2, 5000, "deleted");
+r.afterDelete = (await ids()).join(",");
+r.status = $("library-status").textContent;
+bin("Charlie").click(); await sleep(100);
+[...document.querySelectorAll(".confirm-delete button")].find((b) => b.textContent === "Delete").click();
+await waitFor(() => document.querySelectorAll("#library li").length === 1, 5000, "pending deleted");
+r.afterPendingDelete = (await ids()).join(",");
+window.result = r;

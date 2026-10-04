@@ -49,6 +49,8 @@ then *Add to Home screen*.
   app always asks before adding. The installed
   app is also a share target (manifest `share_target` → service worker inbox):
   shared score files open, shared PDFs/photos start a new scan.
+- **Delete** (bin icon on each library row, or in a score's settings) asks to
+  confirm; locked scores can't be deleted.
 - **Make a copy** (copy icon on each library row): duplicates a score with its photos, marks and
   settings, e.g. to mark first and second sopranos as separate scores.
 - **Lock**: a locked score can't have its part, title or existence changed
@@ -113,6 +115,7 @@ node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 180 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-hidden.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-panel.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-copy.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-delete.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot
 CPU_THROTTLE=4 node scripts/headless-test.mjs "http://localhost:8765/index.html?view=switch" out.json 180 tests/drive-read-timing.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 700 tests/drive-resume.js shot

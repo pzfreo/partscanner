@@ -245,6 +245,12 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .library li.just-added > button:first-child { animation: just-added 2.5s ease-out; }
 @keyframes just-added { from { background: var(--mine); border-color: var(--accent); } }
 .share-spacer { flex: none; width: 44px; }
+.library .share-btn, .library .share-spacer { width: 40px; }
+.library .delete-btn { color: var(--danger); }
+.library .delete-btn:disabled { color: var(--muted); opacity: 0.4; }
+.confirm-delete { flex: 1; padding: 10px 12px; border: 2px solid var(--danger); border-radius: 10px; background: var(--surface); }
+.confirm-delete p { margin: 0 0 8px; }
+.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
 .share-btn svg { width: 24px; height: 24px; fill: currentColor; }
 .share-status { margin: 0 8px; font-size: 0.85rem; }
 .share-status:empty { display: none; }
