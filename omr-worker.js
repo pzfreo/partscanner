@@ -20,36 +20,86 @@ const GPU_MODELS = new Set([MODELS[0], MODELS[1]]);
 let ort;
 
 const post = (msg) => self.postMessage(msg);
-const modelBytes = new Map();
 const sessions = [];
 const sessionIds = new Map();
 let useGpu = false;
 
-async function fetchModel(name) {
-  const url = new URL("models/" + name, location.href).href;
-  const cache = await caches.open(MODEL_CACHE);
-  const cached = await cache.match(url);
-  if (cached) return new Uint8Array(await cached.arrayBuffer());
+// Models download in 4 MB pieces (HTTP range requests), each stored as it
+// arrives, so a dropped or crawling connection resumes where it stopped (even
+// after the app is closed) instead of restarting a 57 MB file.
+const PIECE = 4 * 1024 * 1024;
+const STALL_MS = 30000;
+const MODEL_SIZES = {
+  [MODELS[0]]: 57311361,
+  [MODELS[1]]: 52861122,
+  [MODELS[2]]: 47309835,
+};
+const modelUrl = (name) => new URL("models/" + name, location.href).href;
+const pieceKey = (name, i) => `${modelUrl(name)}?piece=${i}`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Model download failed: ${name} (${res.status})`);
-  const reader = res.body.getReader();
-  const chunks = [];
+async function fetchPiece(url, start, end) {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), STALL_MS);
+  try {
+    const res = await fetch(url, { headers: { Range: `bytes=${start}-${end}` }, cache: "no-store", signal: abort.signal });
+    if (res.status === 200) return { whole: await res.arrayBuffer() }; // server ignores ranges
+    if (res.status !== 206) throw new Error(`unexpected response ${res.status}`);
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength !== end - start + 1) throw new Error("short read");
+    return { piece: buf };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function downloadModel(name) {
+  const cache = await caches.open(MODEL_CACHE);
+  if (await cache.match(modelUrl(name))) return; // stored whole by an earlier version
+  const size = MODEL_SIZES[name];
   let loaded = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
+  for (let i = 0; i * PIECE < size; i++) {
+    const start = i * PIECE;
+    const end = Math.min(size, start + PIECE) - 1;
+    if (!(await cache.match(pieceKey(name, i)))) {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          const got = await fetchPiece(modelUrl(name), start, end);
+          if (got.whole) {
+            if (got.whole.byteLength !== size) throw new Error("short read");
+            await cache.put(modelUrl(name), new Response(got.whole));
+            post({ type: "progress", stage: "download", name, loaded: size, total: MODELS_TOTAL_BYTES });
+            return;
+          }
+          await cache.put(pieceKey(name, i), new Response(got.piece));
+          break;
+        } catch (e) {
+          if (attempt >= 8) {
+            throw new Error(
+              `the connection keeps dropping (${e.message}). What has downloaded is kept; try again on a better connection`,
+            );
+          }
+          post({ type: "progress", stage: "retry", name, attempt });
+          await sleep(Math.min(30000, 2000 * attempt * attempt));
+        }
+      }
+    }
+    loaded = end + 1;
     post({ type: "progress", stage: "download", name, loaded, total: MODELS_TOTAL_BYTES });
   }
-  const bytes = new Uint8Array(loaded);
-  let offset = 0;
-  for (const c of chunks) {
-    bytes.set(c, offset);
-    offset += c.length;
+}
+
+async function modelBytes(name) {
+  const cache = await caches.open(MODEL_CACHE);
+  const whole = await cache.match(modelUrl(name));
+  if (whole) return new Uint8Array(await whole.arrayBuffer());
+  const size = MODEL_SIZES[name];
+  const bytes = new Uint8Array(size);
+  for (let i = 0; i * PIECE < size; i++) {
+    const piece = await cache.match(pieceKey(name, i));
+    if (!piece) throw new Error(`model piece missing: ${name} #${i}`);
+    bytes.set(new Uint8Array(await piece.arrayBuffer()), i * PIECE);
   }
-  await cache.put(url, new Response(bytes));
   return bytes;
 }
 
@@ -67,13 +117,12 @@ self.omrOrt = {
     if (!sessionIds.has(name)) {
       const eps = useGpu && GPU_MODELS.has(name) ? ["webgpu", "wasm"] : ["wasm"];
       const t0 = performance.now();
-      const session = await ort.InferenceSession.create(modelBytes.get(name), {
+      const session = await ort.InferenceSession.create(await modelBytes(name), {
         executionProviders: eps,
         graphOptimizationLevel: "all",
       });
       post({ type: "log", msg: `Loaded ${name} on ${eps[0]} in ${Math.round(performance.now() - t0)} ms` });
       sessionIds.set(name, sessions.push(session) - 1);
-      modelBytes.delete(name);
     }
     const s = sessions[sessionIds.get(name)];
     return { id: sessionIds.get(name), inputNames: s.inputNames, outputNames: s.outputNames };
@@ -125,7 +174,7 @@ async function init() {
   recognise = pyodide.pyimport("runner").recognise;
 
   for (const name of MODELS) {
-    if (!modelBytes.has(name)) modelBytes.set(name, await fetchModel(name));
+    await downloadModel(name);
   }
   post({ type: "ready", gpu: useGpu });
 }

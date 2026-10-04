@@ -176,7 +176,10 @@ function startWorker() {
       if (data.type === "progress" && data.stage === "download") {
         download.set(data.name, data);
         const loaded = [...download.values()].reduce((s, d) => s + d.loaded, 0);
-        setEngineStatus(`Downloading music reader (once only): ${Math.round(loaded / 1e6)} / ${Math.round(data.total / 1e6)} MB`);
+        const mb = loaded < 10e6 ? (loaded / 1e6).toFixed(1) : Math.round(loaded / 1e6);
+        setEngineStatus(`Downloading music reader (once only): ${mb} / ${Math.round(data.total / 1e6)} MB`);
+      } else if (data.type === "progress" && data.stage === "retry") {
+        setEngineStatus(`${engineStatus.split(" · ")[0]} · connection dropped, retrying (${data.attempt})…`);
       } else if (data.type === "progress" && data.stage === "python") {
         setEngineStatus("Starting music reader…");
       } else if (data.type === "ready") {
@@ -189,13 +192,31 @@ function startWorker() {
         else if (/Found \d+ connected staffs/.test(data.msg)) setPageStatus("found the staves");
       } else if (data.type === "result" || data.type === "error") {
         const p = pending.get(data.id);
-        if (!p) return reject(new Error(data.msg));
+        if (!p) {
+          resetWorker();
+          return reject(new Error(data.msg));
+        }
         pending.delete(data.id);
         data.type === "result" ? p.resolve(data.xml) : p.reject(new Error(data.msg));
       }
     };
+    // A crashed worker (e.g. the phone ran out of memory) fails everything waiting
+    // on it; the next attempt starts a fresh one (downloads resume, see worker).
+    worker.onerror = (e) => {
+      const err = new Error(e.message || "the music reader stopped (low memory?)");
+      for (const p of pending.values()) p.reject(err);
+      pending.clear();
+      resetWorker();
+      reject(err);
+    };
   });
   worker.postMessage({ type: "init" });
+}
+
+function resetWorker() {
+  worker?.terminate();
+  worker = null;
+  download.clear();
 }
 
 let engineStatus = "";

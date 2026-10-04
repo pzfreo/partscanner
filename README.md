@@ -19,7 +19,9 @@ then *Add to Home screen*.
   encoder models when available, WASM for the decoder). Python blocks on those
   calls via JSPI, so it needs **Chrome/Edge 137+** (current Chrome on Android
   is fine).
-- **Models**: ~157 MB, downloaded once on first scan and kept in Cache Storage.
+- **Models**: ~157 MB, downloaded once on first scan and kept in Cache Storage,
+  in 4 MB pieces (HTTP range requests) so a dropped connection resumes rather
+  than restarting; a stalled piece is retried.
 - **Parts** (`score.js`): each page is recognised separately. Bars are lined up
   across a page's parts by position (homr occasionally splits a bar for one
   part). Each staff is split into an upper and a lower voice by note onset
@@ -117,6 +119,10 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 te
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-copy.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-delete.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot
+python3 scripts/flaky-server.py 8768 --flaky &   # breaks every 3rd model response
+node scripts/headless-test.mjs "http://localhost:8768/tests/omr-test.html?page=huron_1.png" out.json 380
+python3 scripts/flaky-server.py 8769 &
+node scripts/headless-test.mjs "http://localhost:8769/testdata/" out.json 480 tests/drive-download-resume.js shot
 CPU_THROTTLE=4 node scripts/headless-test.mjs "http://localhost:8765/index.html?view=switch" out.json 180 tests/drive-read-timing.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 700 tests/drive-resume.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-resume-manual.js shot
