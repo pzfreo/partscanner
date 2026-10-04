@@ -61,9 +61,10 @@ export async function scoreFile(entry) {
   const title = entry.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Score";
   const app = new URL("./", location.href).href;
   const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
-  // Opened from WhatsApp/email, the page itself hands the score to the app:
-  // the button opens Partsong and posts the full score (with photos) to it.
-  // Without script, the button is a plain link carrying the score minus photos.
+  // Opened from WhatsApp/email, the button is a link carrying the score minus
+  // photos. With script, it also asks the app to fetch the photos from this
+  // page; if the app can't reach back (e.g. an installed app catches the link),
+  // it still has the score from the link.
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(entry.title)} – Partsong score</title>
@@ -84,7 +85,7 @@ save this file and use <em>Open file</em> in <a href="${app}">${app.replace(/^ht
 <script>
 document.getElementById("open").addEventListener("click", (e) => {
   const json = document.getElementById("${FORMAT}").textContent;
-  const app = window.open(${JSON.stringify(app + "#receive")}, "_blank");
+  const app = window.open(e.currentTarget.href + "&receive", "_blank");
   if (!app) return; // popup blocked: follow the link instead
   e.preventDefault();
   addEventListener("message", function send(ev) {

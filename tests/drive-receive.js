@@ -46,6 +46,18 @@ const copy = all.find((e) => e.title === "Huron (sent) (2)");
 r.viaLink = { images: copy.images.length, pages: copy.pages.length, manual: copy.manual, octave: copy.octave, newId: copy.id !== "sent" };
 r.originalUntouched = all.find((e) => e.id === "sent").images.length === 2;
 r.linkOpensAsRead = !g.contentDocument.getElementById("read-view").hidden;
+// 3. The button's link where the app can't reach back to the file's page
+// (as when an installed app catches it): falls back to the link's score.
+const h = document.createElement("iframe");
+h.src = link.href + "&receive";
+document.body.append(h);
+await waitFor(() => h.contentDocument?.getElementById("import-offer") && !h.contentDocument.getElementById("import-offer").hidden, 20000, "offer without opener");
+r.noOpenerOffer = h.contentDocument.getElementById("import-question").textContent;
+// An older file's bare #receive with no opener says what to do.
+const k = document.createElement("iframe");
+k.src = "/index.html#receive";
+document.body.append(k);
+r.oldFileNoOpener = await waitFor(() => k.contentDocument?.querySelector("#error-toast:not([hidden])")?.textContent, 10000, "old-file error");
 // A fresh device (score not present): the link imports without photos.
 const { entryFromLink } = await import("/share.js");
 const fresh = await entryFromLink(link.href.split("#import=")[1]);

@@ -813,37 +813,50 @@ async function copyScore(id) {
 }
 
 // A score handed over by a .partsong.html file opened in the browser (from
-// WhatsApp, email…): either posted by the page that opened us (#receive, with
-// photos) or carried in the link itself (#import=…, without photos). Always
-// asks first, since any page could try this.
+// WhatsApp, email…): carried in the link itself (#import=…, without photos)
+// and, with &receive, posted in full by the page that opened us when it can
+// (an installed app opened from the link has no way back to that page). Older
+// files sent only #receive. Always asks first, since any page could try this.
 async function receiveFromPage() {
   const hash = location.hash;
   history.replaceState(null, "", location.pathname);
   let entry = null;
   try {
-    if (hash.startsWith("#import=")) entry = await entryFromLink(hash.slice("#import=".length));
-    else if (hash === "#receive" && window.opener) {
-      const json = await new Promise((resolve, reject) => {
-        addEventListener("message", (e) => {
-          if (e.source === window.opener && e.data?.type === "partsong-score") resolve(e.data.json);
-        });
-        const ping = setInterval(() => window.opener?.postMessage("partsong-ready", "*"), 250);
-        setTimeout(() => {
-          clearInterval(ping);
-          reject(new Error("the score didn't arrive"));
-        }, 20000);
-      });
-      entry = parseScoreFile(json);
+    const [, payload, receive] = hash.match(/^#import=([\w-]+)(&receive)?/) ?? [];
+    // Files from before the link carried the score: nothing to fall back on.
+    if (hash === "#receive" && !window.opener) throw new Error("save the file, then use Open file");
+    if ((receive || hash === "#receive") && window.opener) {
+      const json = await fromOpener().catch(() => null);
+      if (json) entry = parseScoreFile(json);
     }
+    if (!entry && payload) entry = await entryFromLink(payload);
+    if (!entry) throw new Error("the score didn't arrive");
   } catch (e) {
     showError(`Couldn't open the shared score: ${e.message}`);
   }
   if (entry) offerImport(entry);
 }
 
+// The full score (with photos) posted by the .partsong.html page that opened us.
+function fromOpener() {
+  return new Promise((resolve, reject) => {
+    addEventListener("message", (e) => {
+      if (e.source !== window.opener || e.data?.type !== "partsong-score") return;
+      clearInterval(ping);
+      resolve(e.data.json);
+    });
+    const ping = setInterval(() => window.opener?.postMessage("partsong-ready", "*"), 250);
+    setTimeout(() => {
+      clearInterval(ping);
+      reject(new Error("the score didn't arrive"));
+    }, 8000);
+  });
+}
+
 async function offerImport(entry) {
   await asNewScore(entry);
-  const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
+  let pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
+  if (!entry.images.length) pages += ", without the page photos";
   $("import-question").textContent = `Add “${entry.title}” (${pages}) to your scores?`;
   $("import-offer").hidden = false;
   $("import-yes").onclick = async () => {
