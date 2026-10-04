@@ -185,6 +185,7 @@ function reportText() {
 // downloads, to attach).
 let reportPrepared = null; // { id, file }
 $("report-share").onclick = async () => {
+  track("report");
   const button = $("report-share");
   const status = $("report-status");
   navigator.clipboard?.writeText(REPORT_TO).catch(() => {});
@@ -285,7 +286,10 @@ $("install-now").onclick = async () => {
   installPrompt.prompt();
   const { outcome } = await installPrompt.userChoice;
   installPrompt = null;
-  if (outcome === "accepted") $("install-card").hidden = true;
+  if (outcome === "accepted") {
+    $("install-card").hidden = true;
+    track("install");
+  }
 };
 $("install-later").onclick = () => {
   $("install-card").hidden = true;
@@ -475,7 +479,16 @@ $("new-scan").onclick = () => (reading ? show("scan") : loadScan());
 
 // The sample score (samples/tallis-if-ye-love-me.pdf, from CPDL):
 // opens the scan screen with its pages added, ready for Read music.
+// Anonymous usage counts (GoatCounter, no cookies; see index.html): which
+// features get used, never titles or music. Silent if blocked or offline.
+function track(name, title = name) {
+  try {
+    window.goatcounter?.count?.({ path: name, title, event: true });
+  } catch {}
+}
+
 async function trySample() {
+  track("sample");
   if (reading) return show("scan");
   loadScan();
   $("scan-name").value = "If ye love me (sample)";
@@ -657,8 +670,10 @@ async function readScan() {
     }
     pageLabel = "";
     setPageStatus(`Done in ${Math.round((performance.now() - t0) / 1000)} s`);
+    track("read-ok", `${pages.length} page${pages.length === 1 ? "" : "s"}`);
   } catch (e) {
     pageLabel = "";
+    track("read-failed");
     setPageStatus(`Couldn't read page ${pages.findIndex((p) => !p.xml) + 1}: ${e.message}`);
     $("recognise").disabled = false;
     return;
@@ -735,6 +750,7 @@ async function shareScore(id, button, status) {
       prepared = { id, file: await scoreFile(entry), title: entry.title };
     }
     const how = await shareFile(prepared.file, prepared.title);
+    if (how === "shared" || how === "downloaded") track("share");
     if (how !== "retry") prepared = null;
     status.textContent = {
       shared: "Shared.",
@@ -835,6 +851,7 @@ async function openInbox() {
 // ---------- practice ----------
 
 let player;
+let playTracked = false; // count the first play of each opened score only
 let current; // library entry
 let score;
 
@@ -844,6 +861,7 @@ function openScore(entry, nav = "push") {
   score = buildScore(entry.pages.map(parsePage));
   player?.stop();
   player = new Player(score);
+  playTracked = false;
   player.onPosition = (beat) => {
     $("position").textContent = `Bar ${barAt(beat).number}`;
     follow(beat);
@@ -1356,6 +1374,8 @@ $("play").onclick = () => {
   resumeAt = null;
   player.play(start, to, $("loop").checked, from);
   setPlaying(true);
+  if (!playTracked) track("play", hasMarks() ? "play (marked)" : "play");
+  playTracked = true;
 };
 
 $("rewind").onclick = () => {

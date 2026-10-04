@@ -70,6 +70,11 @@ then *Add to Home screen*.
   now" snoozes it for a month. Installed apps rarely restart, so the app checks
   for a newer deploy (the version stamped into index.html) when it comes back to
   the screen and every 30 minutes, and offers an Update banner.
+- **Usage counts**: GoatCounter (partsong.goatcounter.com), cookie-free and
+  anonymous: page views plus a few events via `track()` in `app.js` (sample,
+  read-ok/read-failed with page count, first play per opened score, share,
+  install, report). Never titles or music. Its script skips localhost.
+  `tests/drive-analytics.js` checks the events with GoatCounter stubbed.
 - **Sample score** (*Try a sample score*): `samples/tallis-if-ye-love-me.pdf`,
   Tallis's *If ye love me* (ed. K. Jaworski, CPDL licence), three pages: four
   vocal staves plus a piano reduction.
