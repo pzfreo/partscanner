@@ -29,10 +29,10 @@
     </section>
 
     <section id="scan" hidden>
-      <p class="muted">Add one photo per page, in order. Hold the phone square to the page in good light.</p>
+      <p class="muted">Add one photo per page, in order, or a PDF. Hold the phone square to the page in good light.</p>
       <div class="actions">
         <label class="button primary">Take photo<input id="camera" type="file" accept="image/*" capture="environment" hidden></label>
-        <label class="button">Add images<input id="gallery" type="file" accept="image/*" multiple hidden></label>
+        <label class="button">Add images or PDF<input id="gallery" type="file" accept="image/*,application/pdf,.pdf" multiple hidden></label>
       </div>
       <ol id="pages" class="pages"></ol>
       <label class="name-field">Name <input id="scan-name" placeholder="e.g. Huron Carol" autocomplete="off"></label>

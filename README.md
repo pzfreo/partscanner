@@ -29,6 +29,8 @@ then *Add to Home screen*.
   (`<!-- imgpos -->` comments), so playback highlights the current bar on your
   own pages, with a playhead and a marker on your part's note, and auto-scrolls.
   Tap a bar to start from there.
+- **PDF import** (`pdf-pages.js`): "Add images or PDF" renders each page with
+  [pdf.js](https://mozilla.github.io/pdf.js/) at ~300 dpi and treats it like a photo.
 - **Photo orientation** (`orient.js`): phones held flat over a page often save
   it sideways. Sideways pages are detected from the staff lines and turned the
   way a portrait photo would have been (using the stored pixels' EXIF tag);
@@ -64,6 +66,7 @@ node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 te
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-follow.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 400 tests/drive-nav.js shot
 node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" out.json 100
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
 ```
 
 ## Deploy

@@ -12,6 +12,7 @@ const SHELL_FILES = [
   "player.js",
   "db.js",
   "orient.js",
+  "pdf-pages.js",
   "styles.css",
   "omr-worker.js",
   "omr/onnxruntime.py",

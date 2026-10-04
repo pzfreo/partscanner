@@ -2,6 +2,7 @@ import { buildScore, parsePage } from "./score.js";
 import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
+import { isPdf, pdfPages } from "./pdf-pages.js";
 
 const $ = (id) => document.getElementById(id);
 const OSMD_URL = "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.0/build/opensheetmusicdisplay.min.js";
@@ -143,11 +144,28 @@ $("new-scan").onclick = () => {
   startWorker();
 };
 
+async function addPage(image) {
+  const blob = await uprightPhoto(image).catch(() => image);
+  pages.push({ blob, url: URL.createObjectURL(blob) });
+  renderPages();
+}
+
 async function addFiles(files) {
   for (const f of files) {
-    const blob = await uprightPhoto(f).catch(() => f);
-    pages.push({ blob, url: URL.createObjectURL(blob) });
-    renderPages();
+    if (!isPdf(f)) {
+      await addPage(f);
+      continue;
+    }
+    if (!$("scan-name").value.trim()) $("scan-name").value = f.name.replace(/\.pdf$/i, "");
+    try {
+      await pdfPages(f, async (blob, n, count) => {
+        setPageStatus(`Opening ${f.name}: page ${n} of ${count}`);
+        await addPage(blob);
+      });
+      setPageStatus("");
+    } catch (e) {
+      setPageStatus(`Couldn't open ${f.name}: ${e.message}`);
+    }
   }
 }
 $("camera").onchange = (e) => {
