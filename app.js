@@ -36,7 +36,7 @@ function show(name, nav = "push") {
   $("back").hidden = name === "home";
   if (name !== "practice") {
     player?.stop();
-    closeStaffMenu();
+    endMarkup(false);
     releasePhotos("practice");
     $("photo-list").replaceChildren();
     $("panel").hidden = true;
@@ -48,15 +48,17 @@ function show(name, nav = "push") {
 }
 
 function goHome() {
-  const depth = history.state?.panel ? 2 : history.state?.screen ? 1 : 0;
+  const depth = history.state?.panel || history.state?.markup ? 2 : history.state?.screen ? 1 : 0;
   if (depth) history.go(-depth);
   else show("home", "none");
 }
 $("back").onclick = goHome;
 
 window.addEventListener("popstate", (e) => {
-  if (e.state?.screen === "practice" && !$("practice").hidden) setPanel(false, false);
-  else show("home", "none");
+  if (e.state?.screen === "practice" && !$("practice").hidden) {
+    setPanel(false, false);
+    endMarkup(false);
+  } else show("home", "none");
 });
 
 async function renderLibrary() {
@@ -366,7 +368,7 @@ let current; // library entry
 let score;
 
 function openScore(entry, nav = "push") {
-  const partChosen = entry.mine != null || entry.mode != null; // read before defaults are filled in below
+  const partChosen = entry.mine != null || Object.keys(entry.manual ?? {}).length > 0; // before defaults below
   current = entry;
   score = buildScore(entry.pages.map(parsePage));
   player?.stop();
@@ -378,7 +380,7 @@ function openScore(entry, nav = "push") {
   player.onEnd = () => setPlaying(false);
   player.mix = (lineId, t) => {
     if (lineId === myLineAt(t)) return { gain: 1, shift: 12 * current.octave };
-    if (current.mode === "auto" && current.excluded.includes(lineId)) return { gain: 0 };
+    if (!hasMarks() && current.excluded.includes(lineId)) return { gain: 0 };
     return { gain: othersGain, shift: 0 };
   };
 
@@ -391,12 +393,11 @@ function openScore(entry, nav = "push") {
   const soprano = score.lines.findIndex((l) => l.label === "Soprano");
   current.mine = Math.min(entry.mine ?? Math.max(0, soprano), score.lines.length - 1);
   current.excluded = entry.excluded ?? [];
-  current.mode = entry.mode ?? "auto";
   current.manual = entry.manual ?? {};
   current.octave = entry.octave ?? 0;
   $("octave").value = String(current.octave);
   renderLines();
-  renderMode();
+  renderPartChoice();
   applyMix();
   updateLabels();
   player.bpm = Number($("tempo").value);
@@ -451,7 +452,7 @@ function renderFollow() {
         if (p === 0) showBar(barRange()[0]);
         renderMarks();
       };
-      svg.onclick = (e) => (current.mode === "manual" ? openStaffMenu(p, e) : pickBar(p, e));
+      svg.onclick = (e) => (marking ? toggleMark(p, e) : pickBar(p, e));
       pageViews.push(view);
       div.append(img, svg);
       return div;
@@ -547,33 +548,23 @@ function pickBar(page, e) {
 
 let othersGain = 0.25;
 
+// Marks (staff per system, set in mark-up mode) take precedence over the
+// list choice whenever there are any, so nothing is lost by a stray tap.
+const hasMarks = () => Object.keys(current.manual).length > 0;
+
 function myLineAt(beat) {
-  if (current.mode === "auto") return current.mine;
+  if (!hasMarks()) return current.mine;
   return current.manual[barAt(beat).system] ?? null;
 }
 
-function renderMode() {
-  for (const r of document.querySelectorAll('input[name="mode"]')) r.checked = r.value === current.mode;
-  const manual = current.mode === "manual";
-  $("lines").hidden = manual;
-  $("manual-help").hidden = !manual;
-  $("tap-hint").textContent = manual
-    ? "Tap the staff you sing to mark it, in each system you want to learn."
-    : "Tap a bar to start from there.";
+function renderPartChoice() {
   const marked = Object.keys(current.manual).length;
-  $("marked-count").textContent = `${marked} of ${score.systems.length} systems marked.`;
-  $("clear-marks").hidden = !marked;
+  $("auto-part").hidden = marked > 0;
+  $("marked-part").hidden = marked === 0;
+  $("marked-count").textContent = `${marked} of ${score.systems.length} systems`;
+  $("tap-hint").textContent = marking ? "Tap the staff you sing in each system." : "Tap a bar to start from there.";
 }
 
-for (const r of document.querySelectorAll('input[name="mode"]')) {
-  r.onchange = () => {
-    current.mode = r.value;
-    updateEntry(current.id, { mode: current.mode });
-    renderMode();
-    renderMarks();
-  };
-}
-$("clear-marks").onclick = () => setMarks({});
 $("octave").onchange = () => {
   current.octave = Number($("octave").value);
   updateEntry(current.id, { octave: current.octave });
@@ -582,15 +573,83 @@ $("octave").onchange = () => {
 function setMarks(manual) {
   current.manual = manual;
   updateEntry(current.id, { manual });
-  renderMode();
+  renderPartChoice();
   renderMarks();
 }
 
-// Tints the staff you've marked in each system (manual mode only).
+$("clear-marks").onclick = () => {
+  const b = $("clear-marks");
+  if (b.dataset.confirm !== "1") {
+    b.dataset.confirm = "1";
+    b.textContent = "Tap again to clear";
+    setTimeout(() => {
+      b.dataset.confirm = "";
+      b.textContent = "Clear marks";
+    }, 3000);
+    return;
+  }
+  b.dataset.confirm = "";
+  b.textContent = "Clear marks";
+  setMarks({});
+};
+
+// ---------- mark-up mode ----------
+
+let marking = false;
+
+function startMarkup() {
+  if ($("follow").hidden) return;
+  player.stop();
+  // Reuse the open panel's history entry (going back then pushing would race).
+  const fromPanel = history.state?.panel;
+  setPanel(false, false);
+  marking = true;
+  document.body.classList.add("marking");
+  $("markup-bar").hidden = false;
+  const state = { screen: "practice", markup: true };
+  if (fromPanel) history.replaceState(state, "");
+  else history.pushState(state, "");
+  renderPartChoice();
+  window.scrollTo({ top: $("follow").offsetTop - 60, behavior: "smooth" });
+}
+$("start-markup").onclick = startMarkup;
+$("edit-markup").onclick = startMarkup;
+
+// nav=false when the back button already left the mark-up history entry.
+function endMarkup(nav = true) {
+  if (!marking) return;
+  marking = false;
+  document.body.classList.remove("marking");
+  $("markup-bar").hidden = true;
+  if (nav && history.state?.markup) history.back();
+  renderPartChoice();
+}
+$("markup-done").onclick = () => endMarkup();
+
+// Tap a staff to mark it as yours in that system. Tapping the marked staff
+// again steps upper voice -> lower voice -> unmarked (one-voice staff: unmarks).
+function toggleMark(page, e) {
+  const { view, y } = tapPoint(page, e);
+  const gap = (y0, y1) => Math.max(y0 - y, 0, y - y1);
+  const pad = view.h * 0.03;
+  const sys = score.systems
+    .filter((s) => s.page === page && s.box && s.staves.length)
+    .sort((a, b) => gap(a.box.y0 - pad, a.box.y1 + pad) - gap(b.box.y0 - pad, b.box.y1 + pad))[0];
+  if (!sys) return;
+  const staff = sys.staves.slice().sort((a, b) => gap(a.y0, a.y1) - gap(b.y0, b.y1))[0];
+  const order = { upper: 0, only: 1, lower: 2 };
+  const choices = staff.lines.slice().sort((a, b) => order[score.lines[a].voice] - order[score.lines[b].voice]);
+  const now = choices.indexOf(current.manual[sys.index]);
+  const next = now < 0 ? choices[0] : choices[now + 1];
+  const { [sys.index]: _, ...rest } = current.manual;
+  setMarks(next == null ? rest : { ...rest, [sys.index]: next });
+}
+
+// Shades the staff you've marked in each system.
 function renderMarks() {
   for (const [p, view] of pageViews.entries()) {
     view.marks.replaceChildren();
-    if (current.mode !== "manual" || !view.w) continue;
+    if (!view.w) continue;
     for (const [sysIndex, lineId] of Object.entries(current.manual)) {
       const sys = score.systems[sysIndex];
       const line = score.lines[lineId];
@@ -612,69 +671,13 @@ function renderMarks() {
         label.setAttribute("x", sys.box.x1 + px - view.w * 0.005);
         label.setAttribute("y", staff.y0 - py - view.h * 0.004);
         label.setAttribute("text-anchor", "end");
+        label.setAttribute("font-size", view.w * 0.03);
         label.textContent = line.voice === "upper" ? "upper voice" : "lower voice";
         view.marks.append(label);
       }
     }
   }
 }
-
-// Manual mode: tap a staff to choose which voice on it is yours in that system.
-function openStaffMenu(page, e) {
-  const { view, y } = tapPoint(page, e);
-  const gap = (box0, box1) => Math.max(box0 - y, 0, y - box1);
-  const sys = score.systems
-    .filter((s) => s.page === page && s.box && s.staves.length)
-    .sort((a, b) => gap(a.box.y0 - view.h * 0.03, a.box.y1 + view.h * 0.03) - gap(b.box.y0 - view.h * 0.03, b.box.y1 + view.h * 0.03))[0];
-  if (!sys) return pickBar(page, e);
-  const staff = sys.staves.slice().sort((a, b) => gap(a.y0, a.y1) - gap(b.y0, b.y1))[0];
-  const order = { upper: 0, only: 1, lower: 2 };
-  const choices = staff.lines.map((id) => score.lines[id]).sort((a, b) => order[a.voice] - order[b.voice]);
-  const chosen = current.manual[sys.index];
-  const menu = $("staff-menu");
-  const item = (text, action, isChosen = false) => {
-    const b = document.createElement("button");
-    b.textContent = text;
-    b.setAttribute("role", "menuitem");
-    if (isChosen) b.className = "chosen";
-    b.onclick = () => {
-      closeStaffMenu();
-      action();
-    };
-    return b;
-  };
-  menu.replaceChildren(
-    ...choices.map((line) =>
-      item(
-        { upper: "Upper voice", lower: "Lower voice", only: "My part" }[line.voice],
-        () => setMarks({ ...current.manual, [sys.index]: line.id }),
-        line.id === chosen,
-      ),
-    ),
-    ...(chosen != null
-      ? [item("Not mine", () => {
-          const { [sys.index]: _, ...rest } = current.manual;
-          setMarks(rest);
-        })]
-      : []),
-    item("Play from here", () => pickBar(page, e)),
-  );
-  menu.hidden = false;
-  const w = menu.offsetWidth;
-  const h = menu.offsetHeight;
-  menu.style.left = `${Math.min(Math.max(8, e.clientX - w / 2), window.innerWidth - w - 8)}px`;
-  menu.style.top = `${Math.min(Math.max(8, e.clientY + 12), window.innerHeight - h - 90)}px`;
-  setTimeout(() => document.addEventListener("pointerdown", outsideMenu), 0);
-}
-
-function outsideMenu(e) {
-  if (!$("staff-menu").contains(e.target)) closeStaffMenu();
-}
-function closeStaffMenu() {
-  $("staff-menu").hidden = true;
-  document.removeEventListener("pointerdown", outsideMenu);
-}
-window.addEventListener("scroll", closeStaffMenu, { passive: true });
 
 function barAt(beat) {
   let lo = 0;

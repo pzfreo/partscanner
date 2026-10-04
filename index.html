@@ -51,14 +51,17 @@
 
       <div id="panel" class="panel" hidden>
         <h2>Your part</h2>
-        <div class="segmented" role="radiogroup" aria-label="How to choose your part">
-          <label><input type="radio" name="mode" value="auto"> Auto</label>
-          <label><input type="radio" name="mode" value="manual"> Manual</label>
+        <div id="auto-part">
+          <ul id="lines" class="lines"></ul>
+          <p class="muted">If the voices change between verses or staves, mark your part on the music instead.</p>
+          <button id="start-markup">Mark your part on the music</button>
         </div>
-        <ul id="lines" class="lines"></ul>
-        <div id="manual-help" class="manual-help" hidden>
-          <p>Tap the staff you sing on the music, in each system you want to learn. Systems you don't mark have no part of yours.</p>
-          <p><span id="marked-count"></span> <button id="clear-marks" class="link">Clear all</button></p>
+        <div id="marked-part" class="marked-part" hidden>
+          <p>Using your marks: <strong id="marked-count"></strong></p>
+          <div class="actions">
+            <button id="edit-markup">Edit marks</button>
+            <button id="clear-marks" class="danger-text">Clear marks</button>
+          </div>
         </div>
 
         <div class="controls">
@@ -90,7 +93,10 @@
         <button id="delete" class="danger">Delete score</button>
       </div>
 
-      <div id="staff-menu" class="staff-menu" role="menu" hidden></div>
+      <div id="markup-bar" class="markup-bar" hidden>
+        <p>Tap the staff you sing in each system. On a shared staff, tap again for the lower voice, and again to unmark.</p>
+        <button id="markup-done" class="primary">Done</button>
+      </div>
 
       <div class="transport">
         <button id="rewind" class="icon-round" aria-label="Back to start bar">

@@ -24,11 +24,12 @@ then *Add to Home screen*.
   across a page's parts by position (homr occasionally splits a bar for one
   part). Each staff is split into an upper and a lower voice by note onset
   (homr's voice numbers aren't reliable), and bars are grouped into systems.
-- **Choosing your part**: *Auto* matches parts across pages by staff layout and
-  lets you pick one from a list (fine for SATB on two staves). *Manual* is for
-  scores whose voicing changes (open scores, verse-by-verse voicing): tap a staff
-  on the music to mark it as yours in that system, choosing upper/lower voice on
-  shared staves. Unmarked systems have no part of yours. Your part plays at full
+- **Choosing your part**: pick it from the parts list (matched across pages by
+  staff layout; fine for SATB on two staves), or, for scores whose voicing
+  changes, *mark it on the music*: in mark-up mode, tap the staff you sing in
+  each system (tap again on a shared staff for the lower voice, again to unmark).
+  Marks are shaded on the photos and, when there are any, take precedence over
+  the list; unmarked systems have no part of yours. Your part plays at full
   volume, the others at the "Other parts" level; a pitch option shifts your part
   an octave (homr doesn't know the tenor clef's octave).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
