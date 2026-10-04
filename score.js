@@ -35,6 +35,7 @@ export function parsePage(xmlText) {
     let divisions = 1;
     let staves = 1;
     let timeLength = 4;
+    let clef = null; // the top staff's first clef sign (G, F, C)
     const measures = [...part.children].filter((m) => m.tagName === "measure").map((measure) => {
       const notes = [];
       let pos = 0;
@@ -44,6 +45,8 @@ export function parsePage(xmlText) {
         if (el.tagName === "attributes") {
           divisions = num(el, "divisions", divisions);
           staves = Math.max(staves, num(el, "staves", staves));
+          const c = el.querySelector('clef[number="1"], clef:not([number])');
+          clef ??= c?.querySelector("sign")?.textContent ?? null;
           const time = el.querySelector("time");
           if (time) timeLength = (num(time, "beats", 4) * 4) / num(time, "beat-type", 4);
         } else if (el.tagName === "backup") {
@@ -80,7 +83,7 @@ export function parsePage(xmlText) {
       return { notes, length: maxPos || timeLength };
     });
     for (let staff = 1; staff <= staves; staff++) placeNoteheads(measures, staff);
-    return { staves, measures };
+    return { staves, measures, clef };
   });
   return { title, parts };
 }
@@ -264,7 +267,7 @@ export function buildScore(pages) {
     page.parts.forEach((part, idx) => {
       const k = (seen[part.staves] = (seen[part.staves] ?? -1) + 1);
       part.key = `${part.staves}#${k}`;
-      const info = partInfo.get(part.key) ?? { key: part.key, staves: part.staves, order: [] };
+      const info = partInfo.get(part.key) ?? { key: part.key, staves: part.staves, order: [], clef: part.clef };
       info.order.push(idx / Math.max(1, page.parts.length - 1));
       partInfo.set(part.key, info);
     });
@@ -319,6 +322,7 @@ export function buildScore(pages) {
   );
 
   const lines = [];
+  const built = [];
   for (const info of orderedParts) {
     const partLines = [];
     for (let staff = 1; staff <= info.staves; staff++) {
@@ -349,8 +353,29 @@ export function buildScore(pages) {
       if (h.length) partLines.push({ staff, staffKey, voice: twoVoices ? "upper" : "only", notes: h });
       if (twoVoices) partLines.push({ staff, staffKey, voice: "lower", notes: l });
     }
-    lines.push(...labelLines(partLines, info, orderedParts.length));
+    built.push({ info, partLines });
   }
+  // Separate one-staff vocal parts with a two-staff part (a piano reduction or
+  // accompaniment): name the voices, and mark the piano lines so they don't
+  // double the voices by default.
+  const singing = built.filter((b) => b.info.staves === 1 && b.partLines.length === 1);
+  const piano = built.filter((b) => b.info.staves > 1);
+  if (singing.length >= 2 && piano.length) {
+    const names = singing.length === 4 ? ["Soprano", "Alto", "Tenor", "Bass"] : singing.map((_, i) => `Voice ${i + 1}`);
+    for (const b of built) {
+      if (singing.includes(b)) {
+        const line = { ...b.partLines[0], label: names[singing.indexOf(b)], fixedLabel: true };
+        // A tenor part in treble clef is always the octave-lower treble clef,
+        // whose little 8 the reader doesn't report.
+        if (line.label === "Tenor" && b.info.clef === "G") line.notes = line.notes.map((n) => ({ ...n, midi: n.midi - 12 }));
+        lines.push(line);
+      }
+      else if (piano.includes(b)) {
+        const plural = b.partLines.length > 1;
+        lines.push(...b.partLines.map((l, i) => ({ ...l, label: plural ? `Piano ${i + 1}` : "Piano", fixedLabel: true, accompaniment: true })));
+      } else lines.push(...labelLines(b.partLines, b.info, built.length));
+    }
+  } else for (const b of built) lines.push(...labelLines(b.partLines, b.info, built.length));
   if (lines.length === 4 && lines.every((l) => !l.fixedLabel)) {
     ["Soprano", "Alto", "Tenor", "Bass"].forEach((name, i) => (lines[i].label = name));
   }

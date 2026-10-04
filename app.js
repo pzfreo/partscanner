@@ -473,16 +473,16 @@ function loadScan(images = [], xmls = [], id = null, created = null, title = "")
 
 $("new-scan").onclick = () => (reading ? show("scan") : loadScan());
 
-// The sample score (samples/joyful-joyful.pdf, made by scripts/make-sample.py):
+// The sample score (samples/tallis-if-ye-love-me.pdf, from CPDL):
 // opens the scan screen with its pages added, ready for Read music.
 async function trySample() {
   if (reading) return show("scan");
   loadScan();
-  $("scan-name").value = "Joyful, Joyful (sample)";
+  $("scan-name").value = "If ye love me (sample)";
   setPageStatus("Opening the sample…");
   try {
-    const blob = await (await fetch("samples/joyful-joyful.pdf")).blob();
-    await addFiles([new File([blob], "Joyful, Joyful (sample).pdf", { type: "application/pdf" })]);
+    const blob = await (await fetch("samples/tallis-if-ye-love-me.pdf")).blob();
+    await addFiles([new File([blob], "If ye love me (sample).pdf", { type: "application/pdf" })]);
     setPageStatus("Tap Read music to read the sample.");
   } catch (e) {
     setPageStatus(`Couldn't open the sample: ${e.message}`);
@@ -852,7 +852,8 @@ function openScore(entry, nav = "push") {
   player.onEnd = () => setPlaying(false);
   player.mix = (lineId, t) => {
     if (lineId === myLineAt(t)) return { gain: 1, shift: 12 * current.octave };
-    if (!hasMarks() && current.excluded.includes(lineId)) return { gain: 0 };
+    // Marked scores play every line, except a piano part left switched off.
+    if (current.excluded.includes(lineId) && (!hasMarks() || score.lines[lineId].accompaniment)) return { gain: 0 };
     return { gain: othersGain, shift: 0 };
   };
 
@@ -865,7 +866,7 @@ function openScore(entry, nav = "push") {
   $("others").value = entry.others ?? 25;
   const soprano = score.lines.findIndex((l) => l.label === "Soprano");
   current.mine = Math.min(entry.mine ?? Math.max(0, soprano), score.lines.length - 1);
-  current.excluded = entry.excluded ?? [];
+  current.excluded = entry.excluded ?? score.lines.filter((l) => l.accompaniment).map((l) => l.id);
   current.manual = entry.manual ?? {};
   repairReferences();
   current.octave = entry.octave ?? 0;

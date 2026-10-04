@@ -1,11 +1,11 @@
 // Sound setting: the three sounds each render audible audio (first 16 bars of
-// the sample, all parts, offline), and the choice is remembered on the device.
+// Huron, all parts, offline), and the choice is remembered on the device.
 // Returns each rendering as base64 WAV for listening. Run against /index.html.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const $ = (id) => document.getElementById(id);
 const { Player } = await import("/player.js");
 const { parsePage, buildScore } = await import("/score.js");
-const xml = await (await fetch("/samples/joyful-joyful.musicxml")).text();
+const xml = await (await fetch("/testdata/huron_0.musicxml")).text();
 const score = buildScore([parsePage(xml)]);
 const r = { options: [...$("instrument").options].map((o) => o.value), sounds: {} };
 const toWav = (buf) => {

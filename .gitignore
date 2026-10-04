@@ -2,3 +2,4 @@ vendor/
 models/
 testdata/
 .DS_Store
+__pycache__/
