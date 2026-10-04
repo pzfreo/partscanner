@@ -838,7 +838,7 @@ async function receiveFromPage() {
     // file's page): don't add a copy without its photos.
     showNotice(
       `“${entry.title}” has photos of its pages, which can't come across this way. ` +
-        "Go back to the file and tap “Open in the Partsong app”, then choose Partsong.",
+        "Go back to the message, press and hold the file, tap Share and choose Partsong.",
     );
   } else if (entry) offerImport(entry);
 }

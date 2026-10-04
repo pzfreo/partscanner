@@ -74,8 +74,8 @@ export async function scoreFile(entry) {
 <style>
 body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f0e4}
 h1{font-size:1.5rem;margin:0 0 .25em}
-.buttons{margin-top:1.5em}
-.btn{display:block;box-sizing:border-box;width:100%;margin:0 0 .75em;padding:14px;border:2px solid #2b2870;border-radius:12px;background:#fff;color:#2b2870;text-align:center;font:inherit;font-weight:600;font-size:1.1rem;text-decoration:none}
+.steps{margin:1.5em 0 0;padding:14px 16px;border:2px solid #2b2870;border-radius:12px;background:#fff}
+.btn{display:block;box-sizing:border-box;width:100%;margin:1.5em 0 .75em;padding:14px;border:2px solid #2b2870;border-radius:12px;background:#fff;color:#2b2870;text-align:center;font:inherit;font-weight:600;font-size:1.1rem;text-decoration:none}
 .btn.primary{background:#2b2870;color:#fff}
 .small{font-size:.9rem;color:#6b6a66}
 a{color:#2b2870}
@@ -83,13 +83,11 @@ a{color:#2b2870}
 </head><body>
 <h1>${escapeHtml(entry.title)}</h1>
 <p>A <strong>Partsong</strong> score (${pages}) for learning your part.</p>
-<div class="buttons">
-<div id="send-box" hidden>
-<button id="send" class="btn primary">Open in the Partsong app</button>
-<p class="small">If you've installed Partsong on this phone: choose <em>Partsong</em> from the list that appears. Otherwise:</p>
+<div id="app-steps" class="steps" hidden>
+<strong>Installed the Partsong app?</strong> Go back to the message, press and hold this file, tap <em>Share</em>
+and choose <em>Partsong</em>. It's the only way to bring the photos of the pages into the app.
 </div>
 <a id="open" class="btn primary" href="${app}#import=${await linkPayload(doc)}">Open in Partsong on the web</a>
-</div>
 <p class="small">Partsong (<a href="${app}">${app.replace(/^https?:\/\//, "")}</a>) asks before adding the score to your library.</p>
 <script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
 <script>
@@ -104,18 +102,9 @@ document.getElementById("open").addEventListener("click", (e) => {
     removeEventListener("message", send);
   });
 });
-// The installed app can't reach back to this page for the photos, but it
-// takes the whole file from the share sheet, where the browser allows one here
-// (Android only: elsewhere an installed web app can't receive shared files).
-const file = new File(["<!doctype html>\\n" + document.documentElement.outerHTML], ${JSON.stringify(`${title}.partsong.html`).replaceAll("<", "\\u003c")}, { type: "text/html" });
-const send = document.getElementById("send");
-if (/Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
-  // Installed app users must use this one (the web link can't bring photos
-  // into the app), so it comes first.
-  document.getElementById("send-box").hidden = false;
-  document.getElementById("open").classList.remove("primary");
-  send.onclick = () => navigator.share({ files: [file] }).catch(() => {});
-}
+// Where an installed app can catch the link (Android), it can't reach back to
+// this page for the photos; sharing the file itself to it works, so say how.
+if (/Android/.test(navigator.userAgent)) document.getElementById("app-steps").hidden = false;
 </script>
 </body></html>
 `;
