@@ -17,6 +17,16 @@ function imagePosition(note) {
   return null;
 }
 
+// The reader also records homr's own voice tag (omr/runner.py): upper/lower
+// for the first (stem-up) voice on a staff, upper2/lower2 for the second.
+function voiceTag(note) {
+  for (const c of note.childNodes) {
+    const m = c.nodeType === Node.COMMENT_NODE && /homr-voice:\s*(\w+)/.exec(c.data);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 export function parsePage(xmlText) {
   const doc = new DOMParser().parseFromString(xmlText, "application/xml");
   if (doc.querySelector("parsererror")) throw new Error("Not valid MusicXML");
@@ -61,6 +71,7 @@ export function parsePage(xmlText) {
             tieStart: !!el.querySelector('tie[type="start"]'),
             tieStop: !!el.querySelector('tie[type="stop"]'),
             pos: imagePosition(el),
+            tag: voiceTag(el),
           });
         }
         maxPos = Math.max(maxPos, pos);
@@ -72,13 +83,36 @@ export function parsePage(xmlText) {
   return { title, parts };
 }
 
-// Splits one staff's notes in one bar into an upper and a lower line.
-// homr's voice numbers aren't reliable within a bar, so assignment is by
-// onset: of notes starting together, the top goes up and the bottom down; a
+// Splits one staff's notes in one bar into an upper and a lower line, by
+// homr's voice tags when the score has them (first voice -> upper, second ->
+// lower; a bar with only one voice is sung by both).
+function splitStaff(notes) {
+  if (notes.length && notes.every((n) => n.tag)) {
+    const second = notes.filter((n) => n.tag.endsWith("2"));
+    const first = notes.filter((n) => !n.tag.endsWith("2"));
+    if (!second.length) return { high: pickFromChords(first, true), low: pickFromChords(first, false) };
+    return { high: pickFromChords(first, true), low: pickFromChords(second, false) };
+  }
+  return splitByPitch(notes);
+}
+
+// One onset group -> a single note: top for the upper line, bottom for lower.
+function pickFromChords(notes, pickHigh) {
+  const byStart = new Map();
+  for (const n of notes) {
+    if (n.midi == null) continue;
+    const cur = byStart.get(n.start);
+    if (!cur || (pickHigh ? n.midi > cur.midi : n.midi < cur.midi)) byStart.set(n.start, n);
+  }
+  return [...byStart.values()];
+}
+
+// Scores read before voice tags were kept: homr's MusicXML voice numbers
+// aren't reliable within a bar, so assignment is by onset: of notes starting together, the top goes up and the bottom down; a
 // note starting alone is compared with whatever is still sounding on the
 // staff, else follows how its voice was assigned elsewhere in the bar, else
 // it's sung by both (unison).
-function splitStaff(notes) {
+function splitByPitch(notes) {
   const pitched = notes.filter((n) => n.midi != null);
   const onsets = new Map();
   for (const n of pitched) {

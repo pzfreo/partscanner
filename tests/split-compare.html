@@ -1,0 +1,21 @@
+<script type="module">
+// Compares the soprano/alto/tenor/bass split with homr's voice tags against the
+// pitch-only fallback (tags stripped), bar by bar. ?set=huronv&n=4
+import { parsePage, buildScore } from "../score.js";
+const q = new URLSearchParams(location.search);
+const set = q.get("set") || "huronv", count = Number(q.get("n") || 4);
+const names = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
+const nn = (m) => names[m % 12] + (Math.floor(m / 12) - 1);
+const xmls = await Promise.all([...Array(count).keys()].map((i) => fetch(`../testdata/${set}_${i}.musicxml`).then((r) => r.text())));
+const tagged = buildScore(xmls.map(parsePage));
+const plain = buildScore(xmls.map((x) => parsePage(x.replace(/<!-- homr-voice: \w+ -->/g, ""))));
+const bar = (s, line, b) => { const m = s.measures[b - 1]; return s.lines[line].notes.filter((n) => n.t >= m.start && n.t < m.start + m.length).map((n) => nn(n.midi) + "/" + n.dur).join(" "); };
+const diffs = [];
+for (let b = 1; b <= tagged.measures.length; b++) {
+  for (const [i, l] of tagged.lines.entries()) {
+    const a = bar(tagged, i, b), p = bar(plain, i, b);
+    if (a !== p) diffs.push({ bar: b, line: l.label, tags: a, pitch: p });
+  }
+}
+window.result = { bars: tagged.measures.length, labels: tagged.lines.map((l) => l.label), differing: diffs.length, diffs };
+</script>

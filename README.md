@@ -24,8 +24,11 @@ then *Add to Home screen*.
   than restarting; a stalled piece is retried.
 - **Parts** (`score.js`): each page is recognised separately. Bars are lined up
   across a page's parts by position (homr occasionally splits a bar for one
-  part). Each staff is split into an upper and a lower voice by note onset
-  (homr's voice numbers aren't reliable), and bars are grouped into systems.
+  part). Each staff is split into an upper and a lower voice using homr's own
+  per-note voice tags (upper/upper2, lower/lower2: stem-up and stem-down voices),
+  which `omr/runner.py` keeps in the MusicXML as comments because homr's writer
+  renumbers voices; scores read before that fall back to a pitch/onset guess.
+  Bars are grouped into systems.
 - **Choosing your part**: pick it from the parts list (matched across pages by
   staff layout; fine for SATB on two staves), or, for scores whose voicing
   changes, *mark it on the music*: in mark-up mode, tap the staff you sing in
@@ -98,6 +101,7 @@ each page's pixels turned 90° anticlockwise, saved with EXIF orientation 1, 3 o
 ```sh
 node scripts/headless-test.mjs "http://localhost:8765/tests/omr-test.html?page=huron_1.png" out.json
 node scripts/headless-test.mjs "http://localhost:8765/tests/score-test.html?set=huron&n=4" out.json 30
+node scripts/headless-test.mjs "http://localhost:8765/tests/split-compare.html?set=huronv&n=4" out.json 30
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 600 tests/drive-app.js shot
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 600 tests/drive-offline.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-library.js shot

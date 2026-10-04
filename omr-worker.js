@@ -165,10 +165,12 @@ async function init() {
 
   const lib = "/home/pyodide/lib";
   pyodide.FS.mkdirTree(lib);
-  const homrZip = await (await fetch("vendor/homr.zip")).arrayBuffer();
+  // Same deploy version as this worker (?v=… from scripts/stamp-version.mjs).
+  const v = location.search;
+  const homrZip = await (await fetch("vendor/homr.zip" + v)).arrayBuffer();
   pyodide.unpackArchive(homrZip, "zip", { extractDir: lib });
   for (const f of ["onnxruntime.py", "runner.py"]) {
-    pyodide.FS.writeFile(`${lib}/${f}`, await (await fetch("omr/" + f)).text());
+    pyodide.FS.writeFile(`${lib}/${f}`, await (await fetch("omr/" + f + v)).text());
   }
   pyodide.runPython(`import sys; sys.path.insert(0, "${lib}")`);
   recognise = pyodide.pyimport("runner").recognise;
