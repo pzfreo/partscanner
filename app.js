@@ -88,6 +88,7 @@ async function renderLibrary() {
       .sort((a, b) => b.created - a.created)
       .map((entry) => {
         const li = document.createElement("li");
+        li.dataset.id = entry.id;
         const b = document.createElement("button");
         const n = entry.pages.length;
         const done = entry.pages.filter(Boolean).length;
@@ -459,17 +460,18 @@ async function shareScore(id, button, status) {
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
 
-// A copy of a score (photos, music, marks, settings), unlocked, named
-// "Title (2)" and opened with its title selected for renaming, e.g. to mark up
+// A copy of a score (photos, music, marks, settings), unlocked and named
+// "Title (2)", added to the list (rename it when you open it), e.g. to mark up
 // first and second sopranos as separate scores.
 async function copyScore(id) {
   const original = (await db.all()).find((e) => e.id === id);
   const copy = await asNewScore({ ...original, id: crypto.randomUUID(), created: Date.now(), locked: false });
   await db.put(copy);
-  openScore(copy);
-  $("title").focus();
-  $("title").select();
-  $("share-status").textContent = "Copy made. Give it a new name.";
+  await renderLibrary();
+  document.querySelector(`#library li[data-id="${copy.id}"]`)?.classList.add("just-added");
+  $("library-status").textContent = `Copied as “${copy.title}”. Open it to rename.`;
+  clearTimeout(shareScore.timer);
+  shareScore.timer = setTimeout(() => ($("library-status").textContent = ""), 5000);
 }
 
 // A score handed over by a .partsong.html file opened in the browser (from

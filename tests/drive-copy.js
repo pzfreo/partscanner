@@ -13,11 +13,20 @@ await shot(false);
 await waitFor(() => document.querySelector("#library button"), 5000, "library");
 const r0 = { rowButtons: [...document.querySelector("#library li").querySelectorAll("button")].map((b) => b.getAttribute("aria-label") || "row") };
 document.querySelector('#library button[aria-label="Make a copy of Huron"]').click();
-await waitFor(() => $("title").value === "Huron (2)", 5000, "copy opened");
-await sleep(400);
+await waitFor(() => document.querySelectorAll("#library li").length === 2, 5000, "copy listed");
+await sleep(200);
 const r = { ...r0 };
-r.copyOpen = { title: $("title").value, titleSelected: document.activeElement === $("title") && $("title").selectionEnd - $("title").selectionStart === $("title").value.length, panelClosed: $("panel").hidden, editable: !$("title").readOnly, status: $("share-status").textContent };
-// Rename it and change its marks; the original must not change.
+r.afterCopy = {
+  stayedOnList: !$("home").hidden,
+  names: [...document.querySelectorAll("#library .name")].map((n) => n.textContent),
+  highlighted: document.querySelector("#library li.just-added .name")?.textContent,
+  status: $("library-status").textContent,
+};
+await shot(false);
+// Open the copy, rename it and change its marks; the original must not change.
+document.querySelector("#library li.just-added button").click();
+await sleep(500);
+r.copyEditable = !$("title").readOnly;
 $("title").value = "Huron S2"; $("title").dispatchEvent(new Event("change"));
 $("settings").click(); await sleep(300);
 $("clear-marks").click(); $("clear-marks").click(); await sleep(300);

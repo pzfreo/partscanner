@@ -242,6 +242,8 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .share-btn { flex: none; width: 44px; height: 44px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--accent); }
 .import-offer { margin: 16px 0; padding: 14px 16px; border: 2px solid var(--accent); border-radius: 12px; background: var(--mine); }
 .import-offer p { margin: 0 0 10px; }
+.library li.just-added > button:first-child { animation: just-added 2.5s ease-out; }
+@keyframes just-added { from { background: var(--mine); border-color: var(--accent); } }
 .share-spacer { flex: none; width: 44px; }
 .share-btn svg { width: 24px; height: 24px; fill: currentColor; }
 .share-status { margin: 0 8px; font-size: 0.85rem; }
