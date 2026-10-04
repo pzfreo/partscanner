@@ -79,9 +79,12 @@ a{color:#2b2870}
 </head><body>
 <h1>${escapeHtml(entry.title)}</h1>
 <p>A <strong>Partsong</strong> score (${pages}) for learning your part.</p>
-<a id="open" class="open" href="${app}#import=${await linkPayload(doc)}">Open in Partsong</a>
-<button id="send" class="send" hidden>Have the Partsong app? Send it there</button>
-<p class="small">Partsong (<a href="${app}">${app.replace(/^https?:\/\//, "")}</a>) opens and asks to add the score to your library.</p>
+<a id="open" class="open" href="${app}#import=${await linkPayload(doc)}">Open in Partsong on the web</a>
+<div id="send-box" hidden>
+<button id="send" class="send">Open in the Partsong app</button>
+<p class="small">If you've installed Partsong on this phone: choose <em>Partsong</em> from the list that appears.</p>
+</div>
+<p class="small">Partsong (<a href="${app}">${app.replace(/^https?:\/\//, "")}</a>) asks before adding the score to your library.</p>
 <script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
 <script>
 document.getElementById("open").addEventListener("click", (e) => {
@@ -101,7 +104,7 @@ document.getElementById("open").addEventListener("click", (e) => {
 const file = new File(["<!doctype html>\\n" + document.documentElement.outerHTML], ${JSON.stringify(`${title}.partsong.html`).replaceAll("<", "\\u003c")}, { type: "text/html" });
 const send = document.getElementById("send");
 if (/Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
-  send.hidden = false;
+  document.getElementById("send-box").hidden = false;
   send.onclick = () => navigator.share({ files: [file] }).catch(() => {});
 }
 </script>
