@@ -22,7 +22,7 @@ $("play").click();
 await sleep(3000);
 const pos = $("position").textContent;
 $("play").click();
-$("score-view").open = true;
+$("view-read").click();
 await waitFor(() => document.querySelectorAll("#osmd svg").length >= 4, 30000, "osmd render");
 await sleep(500);
 await shot();

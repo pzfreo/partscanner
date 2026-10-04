@@ -32,6 +32,9 @@ then *Add to Home screen*.
   the list; unmarked systems have no part of yours. Your part plays at full
   volume, the others at the "Other parts" level; a pitch option shifts your part
   an octave (homr doesn't know the tenor clef's octave).
+- **Pages / As read**: switch between your photos (follow-along, marking) and
+  the recognised score drawn with OpenSheetMusicDisplay, to spot recognition
+  errors. Imported MusicXML opens on As read.
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
@@ -85,6 +88,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-manual.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-lock.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-views.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 700 tests/drive-resume.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-resume-manual.js shot
 ```

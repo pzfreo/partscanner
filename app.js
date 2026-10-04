@@ -405,13 +405,16 @@ function openScore(entry, nav = "push") {
   $("position").textContent = "Bar 1";
   setPlaying(false);
   resumeAt = null;
-  $("score-view").open = false;
   $("osmd").replaceChildren();
+  osmdFor = null;
   show("practice", nav);
   // New scans (no part chosen yet) and photo-less scores start with settings open.
   $("panel").hidden = true;
   setPanel(!partChosen || !entry.images?.length);
   renderFollow();
+  // Pages (photos) when there are any to follow along on; otherwise the read score.
+  $("view-switch").hidden = $("follow").hidden;
+  setView($("follow").hidden ? "read" : "pages");
 }
 
 // ---------- following along on the photos ----------
@@ -599,7 +602,8 @@ $("clear-marks").onclick = () => {
 let marking = false;
 
 function startMarkup() {
-  if ($("follow").hidden) return;
+  if ($("view-switch").hidden) return;
+  setView("pages");
   player.stop();
   // Reuse the open panel's history entry (going back then pushing would race).
   const fromPanel = history.state?.panel;
@@ -851,20 +855,40 @@ $("delete").onclick = () => {
   db.remove(current.id).finally(goHome);
 };
 
-// Rendering is only for checking recognition, so load OSMD on demand.
+// ---------- Pages / As read ----------
+
+function setView(view) {
+  const pages = view === "pages";
+  $("follow").hidden = !pages;
+  $("read-view").hidden = pages;
+  $("view-pages").setAttribute("aria-selected", String(pages));
+  $("view-read").setAttribute("aria-selected", String(!pages));
+  if (!pages) renderRead();
+}
+$("view-pages").onclick = () => setView("pages");
+$("view-read").onclick = () => setView("read");
+
+// Draws the recognised MusicXML with OSMD, loaded on first use.
 let osmdLoaded;
-$("score-view").ontoggle = async () => {
-  if (!$("score-view").open || $("osmd").childElementCount) return;
+let osmdFor = null; // the score currently drawn
+async function renderRead() {
+  if (osmdFor === current) return;
+  const entry = (osmdFor = current);
+  $("osmd").replaceChildren();
   osmdLoaded ??= new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = OSMD_URL;
     s.onload = resolve;
-    s.onerror = () => reject(new Error("Couldn't load the score viewer (offline?)"));
+    s.onerror = () => {
+      osmdLoaded = null;
+      reject(new Error("Couldn't load the score viewer (offline?)"));
+    };
     document.head.append(s);
   });
   try {
     await osmdLoaded;
-    for (const xml of current.pages) {
+    for (const xml of entry.pages) {
+      if (osmdFor !== entry) return; // another score was opened meanwhile
       const div = document.createElement("div");
       $("osmd").append(div);
       const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(div, {
@@ -877,9 +901,10 @@ $("score-view").ontoggle = async () => {
       osmd.render();
     }
   } catch (e) {
+    osmdFor = null;
     $("osmd").textContent = e.message;
   }
-};
+}
 
 if ("serviceWorker" in navigator && location.hostname !== "localhost") {
   navigator.serviceWorker.register("sw.js");

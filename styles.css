@@ -130,6 +130,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .marked-part p { margin: 0 0 10px; }
 .danger-text { color: var(--danger); }
 #auto-part > .muted { margin: 14px 0 8px; }
+#start-markup { width: 100%; }
 .markup-bar {
   position: fixed;
   left: 0;
@@ -222,7 +223,12 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .panel .danger { margin: 24px auto 8px; display: flex; }
 
 details { margin-top: 24px; }
-.follow { margin-top: 24px; }
+.view-switch { display: flex; margin: 16px 0 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; }
+.view-switch[hidden] { display: none; }
+.view-switch button { min-height: 40px; border: 0; border-radius: 0; background: var(--surface); font-weight: 500; }
+.view-switch button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+.follow { margin-top: 12px; }
+.read-view { margin-top: 12px; }
 .photo-list { display: grid; gap: 8px; }
 .photo-list .page { position: relative; }
 .photo-list img { width: 100%; display: block; border-radius: 8px; border: 1px solid var(--border); }
