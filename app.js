@@ -3,7 +3,7 @@ import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
-import { entryFromLink, parseScoreFile, scoreFile, shareFile } from "./share.js";
+import { entryFromLink, isMobile, parseScoreFile, scoreFile, shareFile } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -119,7 +119,12 @@ function diagnostics() {
 
 function openReport() {
   $("report-diag").textContent = diagnostics();
-  $("report-status").textContent = `Opens your email app, addressed to ${REPORT_TO}.`;
+  const withScore = !$("practice").hidden && !!current;
+  $("report-share").hidden = !withScore;
+  $("report-send").classList.toggle("primary", !withScore);
+  $("report-status").textContent = withScore
+    ? `Share report with score attaches the score (photos and music) so the problem can be reproduced.`
+    : `Opens your email app, addressed to ${REPORT_TO}.`;
   $("report").hidden = false;
   history.pushState({ ...history.state, report: true }, "");
   $("report-text").focus();
@@ -146,6 +151,48 @@ $("report-send").onclick = () => {
   $("report-send").dataset.href = url; // what was handed to the mail app (also used by tests)
   location.href = url;
   $("report-status").textContent = `If no email app opened, use Copy report and send it to ${REPORT_TO}.`;
+};
+
+// The report plus the open score as a file. Phones: the share sheet (pick
+// email; the address is copied to paste in, since a web app can't fill in the
+// recipient). Desktop: download the file and open the report email.
+let reportPrepared = null; // { id, file }
+$("report-share").onclick = async () => {
+  const button = $("report-share");
+  const status = $("report-status");
+  navigator.clipboard?.writeText(REPORT_TO).catch(() => {});
+  button.disabled = true;
+  try {
+    if (reportPrepared?.id !== current.id) {
+      status.textContent = "Preparing the score…";
+      const entry = (await db.all()).find((e) => e.id === current.id) ?? current;
+      reportPrepared = { id: current.id, file: await scoreFile(entry) };
+    }
+    const file = reportPrepared.file;
+    const what = $("report-text").value.trim().split("\n")[0].slice(0, 60);
+    const title = `Partsong problem${what ? `: ${what}` : ""}`;
+    const text = `To: ${REPORT_TO}\n\n${reportText()}`;
+    if (isMobile() && navigator.canShare?.({ files: [file], text })) {
+      try {
+        await navigator.share({ files: [file], title, text });
+        reportPrepared = null;
+        status.textContent = `Shared. If you chose email, paste ${REPORT_TO} (copied) as the recipient.`;
+      } catch (e) {
+        status.textContent =
+          e.name === "NotAllowedError" ? "Ready. Tap Share report with score again." : e.name === "AbortError" ? "" : `Couldn't share: ${e.message}`;
+      }
+    } else {
+      await shareFile(file, title); // downloads on desktop
+      reportPrepared = null;
+      $("report-send").click();
+      status.textContent = `Attach the downloaded file (${file.name}) to the email that opened.`;
+    }
+  } catch (e) {
+    reportPrepared = null;
+    status.textContent = `Couldn't prepare the score: ${e.message}`;
+  } finally {
+    button.disabled = false;
+  }
 };
 
 $("report-copy").onclick = async () => {

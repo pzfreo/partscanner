@@ -125,7 +125,7 @@ export function parseScoreFile(text) {
   };
 }
 
-const isMobile = () => navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+export const isMobile = () => navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 // Phones: the share sheet (WhatsApp, Drive, email). Desktop: a plain download,
 // even where the browser offers a share menu (e.g. Chrome on macOS).

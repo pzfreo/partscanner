@@ -62,7 +62,9 @@ then *Add to Home screen*.
   bugs@partsong.app (forwarded via Namecheap) with the description plus the app
   version, device, current score/bar/part settings, recent errors and the
   reader's recent log, all shown to the user first; *Copy report* if there's no
-  mail app.
+  mail app. With a score open, *Share report with score* also attaches the score
+  file (share sheet on phones, with the address copied to paste in; download +
+  email on desktop).
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
