@@ -28,7 +28,7 @@ jobs:
         run: |
           mkdir -p _site/vendor
           cp -r index.html *.js styles.css manifest.webmanifest icon.svg icon-192.png icon-512.png \
-            omr models _site/
+            omr models fonts _site/
           cp vendor/homr.zip _site/vendor/
           mkdir -p _site/samples && cp samples/tallis-if-ye-love-me.pdf _site/samples/
       - name: Stamp the version onto the app's CSS/JS references

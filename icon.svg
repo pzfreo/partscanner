@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1f4e5f"/>
-  <g stroke="#cfe3ea" stroke-width="14" stroke-linecap="round">
+  <rect width="512" height="512" rx="96" fill="#2b2870"/>
+  <g stroke="#d6d4ff" stroke-width="14" stroke-linecap="round">
     <line x1="96" y1="168" x2="416" y2="168"/>
     <line x1="96" y1="296" x2="416" y2="296"/>
     <line x1="96" y1="360" x2="416" y2="360"/>
   </g>
-  <line x1="96" y1="232" x2="416" y2="232" stroke="#f2b544" stroke-width="22" stroke-linecap="round"/>
-  <ellipse cx="236" cy="232" rx="44" ry="34" transform="rotate(-20 236 232)" fill="#f2b544"/>
-  <line x1="276" y1="222" x2="276" y2="88" stroke="#f2b544" stroke-width="16" stroke-linecap="round"/>
+  <line x1="96" y1="232" x2="416" y2="232" stroke="#ff6a55" stroke-width="22" stroke-linecap="round"/>
+  <ellipse cx="236" cy="232" rx="44" ry="34" transform="rotate(-20 236 232)" fill="#ff6a55"/>
+  <line x1="276" y1="222" x2="276" y2="88" stroke="#ff6a55" stroke-width="16" stroke-linecap="round"/>
 </svg>

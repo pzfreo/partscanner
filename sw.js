@@ -22,6 +22,7 @@ const SHELL_FILES = [
   "manifest.webmanifest",
   "icon.svg",
   "icon-192.png",
+  "fonts/plus-jakarta-sans-latin-wght.woff2",
 ];
 
 self.addEventListener("install", (e) => {

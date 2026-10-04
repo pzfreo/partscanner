@@ -68,11 +68,11 @@ export async function scoreFile(entry) {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(entry.title)} – Partsong score</title>
 <style>
-body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f4ef}
+body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f0e4}
 h1{font-size:1.5rem;margin:0 0 .25em}
-.open{display:block;margin:1.5em 0 .75em;padding:16px;border-radius:12px;background:#1f4e5f;color:#fff;text-align:center;font-weight:600;font-size:1.1rem;text-decoration:none}
+.open{display:block;margin:1.5em 0 .75em;padding:16px;border-radius:12px;background:#26355e;color:#fff;text-align:center;font-weight:600;font-size:1.1rem;text-decoration:none}
 .small{font-size:.9rem;color:#6b6a66}
-a{color:#1f4e5f}
+a{color:#26355e}
 </style>
 </head><body>
 <h1>${escapeHtml(entry.title)}</h1>
