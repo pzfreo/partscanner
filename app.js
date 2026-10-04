@@ -876,6 +876,10 @@ async function openInbox() {
     files.push(new File([await res.blob()], name, { type: res.headers.get("content-type") || "" }));
     await cache.delete(req);
   }
+  if (!files.length) {
+    $("library-status").textContent = "Nothing arrived from the share. Try sharing it again.";
+    return;
+  }
   const scans = [];
   const others = [];
   for (const f of files) {
@@ -1709,7 +1713,9 @@ if (/^#(receive|import=)/.test(location.hash)) {
   renderLibrary().then(receiveFromPage);
 } else if (new URLSearchParams(location.search).has("inbox")) {
   history.replaceState(null, "", location.pathname);
-  renderLibrary().then(openInbox);
+  renderLibrary()
+    .then(openInbox)
+    .catch((e) => showError(`Couldn't open the shared file: ${e.message}`));
 } else {
   renderLibrary().then(resumeUnfinished);
 }
