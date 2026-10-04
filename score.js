@@ -240,14 +240,19 @@ function alignBars(page) {
   const xs = page.parts.flatMap((p) => p.measures.flatMap((m) => m.notes.filter((n) => n.pos).map((n) => n.pos.x)));
   const tol = (Math.max(...xs) - Math.min(...xs)) * 0.03;
   for (const part of page.parts) {
-    if (part.measures.length <= mode) continue;
+    // Empty bars (no notes or rests at all, e.g. around a repeat's endings)
+    // are reading artefacts: drop those first.
+    let extra = part.measures.length - mode;
+    if (extra <= 0) continue;
+    part.measures = part.measures.filter((m) => m.notes.length || extra-- <= 0);
     const out = [];
     for (const m of part.measures) {
       const prev = out.at(-1);
       const x0 = barX0(m);
       const nextRef = ref[out.length];
       const px0 = prev && barX0(prev);
-      if (prev && x0 != null && px0 != null && nextRef != null && x0 > px0 && x0 < nextRef - tol) {
+      if (extra > 0 && prev && x0 != null && px0 != null && nextRef != null && x0 > px0 && x0 < nextRef - tol) {
+        extra--;
         prev.notes.push(...m.notes.map((n) => ({ ...n, start: n.start + prev.length })));
         prev.length += m.length;
       } else out.push({ ...m, notes: [...m.notes] });
