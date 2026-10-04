@@ -42,7 +42,7 @@
     </section>
 
     <section id="practice" hidden>
-      <label class="title-wrap"><input id="title" class="title-input" aria-label="Score title (tap to rename)"><span aria-hidden="true">&#9998;</span></label>
+      <label class="title-wrap"><input id="title" class="title-input" aria-label="Score title (tap to rename)"><span id="title-icon" aria-hidden="true">&#9998;</span></label>
 
       <div id="follow" class="follow" hidden>
         <p id="tap-hint" class="muted">Tap a bar to start from there.</p>
@@ -50,6 +50,10 @@
       </div>
 
       <div id="panel" class="panel" hidden>
+        <label class="lock-row">
+          <input type="checkbox" id="lock">
+          <span><strong>Lock this score</strong><br><span class="muted">Stops changes to your part, the title and Delete.</span></span>
+        </label>
         <h2>Your part</h2>
         <div id="auto-part">
           <ul id="lines" class="lines"></ul>
@@ -68,7 +72,7 @@
           <label><span>Other parts <output id="others-val"></output></span>
             <input id="others" type="range" min="0" max="100" value="25">
           </label>
-          <label><span>Your part's pitch</span>
+          <label class="octave-row"><span>Your part's pitch</span>
             <select id="octave">
               <option value="0">As written</option>
               <option value="-1">An octave lower (tenor clef)</option>

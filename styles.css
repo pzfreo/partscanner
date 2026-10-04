@@ -124,6 +124,9 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .title-input:focus { border-color: var(--border); background: var(--surface); outline: none; }
 
+.lock-row { display: flex; align-items: center; gap: 12px; margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.lock-row .muted { font-size: 0.85rem; }
+#panel.locked #auto-part, #panel.locked #marked-part, #panel.locked .octave-row { opacity: 0.55; }
 .marked-part p { margin: 0 0 10px; }
 .danger-text { color: var(--danger); }
 #auto-part > .muted { margin: 14px 0 8px; }

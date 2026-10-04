@@ -76,7 +76,7 @@ async function renderLibrary() {
         const done = entry.pages.filter(Boolean).length;
         const info = entry.pending ? `Reading… ${done} of ${n}` : `${n} page${n > 1 ? "s" : ""}`;
         b.innerHTML = `<span class="thumb"></span><span class="name"></span><small>${info}</small>`;
-        b.querySelector(".name").textContent = entry.title;
+        b.querySelector(".name").textContent = (entry.locked ? "🔒 " : "") + entry.title;
         if (entry.images?.length) {
           const img = document.createElement("img");
           img.alt = "";
@@ -398,6 +398,7 @@ function openScore(entry, nav = "push") {
   $("octave").value = String(current.octave);
   renderLines();
   renderPartChoice();
+  applyLock();
   applyMix();
   updateLabels();
   player.bpm = Number($("tempo").value);
@@ -690,6 +691,30 @@ function barAt(beat) {
   return score.measures[lo];
 }
 
+// ---------- lock: stops accidental changes to the part, title and delete ----------
+
+function applyLock() {
+  const locked = !!current.locked;
+  $("lock").checked = locked;
+  $("panel").classList.toggle("locked", locked);
+  $("title").readOnly = locked;
+  $("title-icon").textContent = locked ? "🔒" : "✎";
+  for (const el of [
+    ...document.querySelectorAll("#lines input"),
+    $("octave"),
+    $("start-markup"),
+    $("edit-markup"),
+    $("clear-marks"),
+    $("delete"),
+  ]) el.disabled = locked;
+}
+
+$("lock").onchange = () => {
+  current.locked = $("lock").checked;
+  updateEntry(current.id, { locked: current.locked });
+  applyLock();
+};
+
 function renderLines() {
   $("lines").replaceChildren(
     ...score.lines.map((line) => {
@@ -721,6 +746,7 @@ function renderLines() {
       return li;
     }),
   );
+  if (current.locked) for (const el of document.querySelectorAll("#lines input")) el.disabled = true;
 }
 
 // Takes effect from the next notes scheduled (within a quarter second).
