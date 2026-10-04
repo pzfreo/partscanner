@@ -15,7 +15,11 @@ function load() {
   return pdfjs;
 }
 
-export const isPdf = (file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+// By content: pickers (e.g. Drive on Android) may give no type or extension.
+export async function isPdf(file) {
+  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  return String.fromCharCode(...head) === "%PDF-";
+}
 
 // Calls onPage(blob, pageNumber, pageCount) for each page, in order.
 export async function pdfPages(file, onPage) {

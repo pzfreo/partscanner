@@ -145,29 +145,46 @@ $("new-scan").onclick = () => {
 };
 
 async function addPage(image) {
-  const blob = await uprightPhoto(image).catch(() => image);
+  const blob = await uprightPhoto(image);
   pages.push({ blob, url: URL.createObjectURL(blob) });
   renderPages();
 }
 
+// Why a picked file can't be used, in words a user can act on.
+async function unreadableReason(file) {
+  if (file.size === 0) return "the file is empty. If it's in Google Photos or Drive, download it to the phone first";
+  const head = String.fromCharCode(...new Uint8Array(await file.slice(0, 16).arrayBuffer()));
+  if (/ftyp(heic|heix|hevc|heif|mif1|msf1)/.test(head)) {
+    return "it's a HEIC photo, which Chrome can't open. Use Take photo, or set the camera to save JPEG";
+  }
+  return "it isn't an image or PDF this browser can open";
+}
+
 async function addFiles(files) {
+  const problems = [];
   for (const f of files) {
-    if (!isPdf(f)) {
-      await addPage(f);
+    const name = f.name || "file";
+    if (await isPdf(f)) {
+      if (!$("scan-name").value.trim()) $("scan-name").value = name.replace(/\.pdf$/i, "");
+      try {
+        await pdfPages(f, async (blob, n, count) => {
+          setPageStatus(`Opening ${name}: page ${n} of ${count}`);
+          await addPage(blob);
+        });
+      } catch (e) {
+        problems.push(`Couldn't open ${name}: ${e.message}`);
+      }
       continue;
     }
-    if (!$("scan-name").value.trim()) $("scan-name").value = f.name.replace(/\.pdf$/i, "");
     try {
-      await pdfPages(f, async (blob, n, count) => {
-        setPageStatus(`Opening ${f.name}: page ${n} of ${count}`);
-        await addPage(blob);
-      });
-      setPageStatus("");
-    } catch (e) {
-      setPageStatus(`Couldn't open ${f.name}: ${e.message}`);
+      await addPage(f);
+    } catch {
+      problems.push(`Couldn't add ${name}: ${await unreadableReason(f)}.`);
     }
   }
+  setPageStatus(problems.join("\n"));
 }
+
 $("camera").onchange = (e) => {
   addFiles([...e.target.files]);
   e.target.value = "";

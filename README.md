@@ -67,6 +67,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 400 tests/drive-nav.js shot
 node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" out.json 100
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
 ```
 
 ## Deploy
