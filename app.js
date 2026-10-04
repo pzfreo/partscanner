@@ -394,18 +394,26 @@ async function openFiles(files) {
     }
     if (!xmls.length) return;
     const title = parsePage(xmls[0]).title || name || "Imported score";
-    const entry = { id: crypto.randomUUID(), title, created: Date.now(), pages: xmls, images: [] };
-    await db.put(entry);
-    openScore(entry);
+    await importScore({ id: crypto.randomUUID(), title, created: Date.now(), pages: xmls, images: [] });
   } catch (err) {
     $("library-empty").hidden = false;
     $("library-empty").textContent = `Couldn't open that file: ${err.message}`;
   }
 }
 
-// A shared score keeps its id, so receiving a newer copy replaces the old one.
+// Imports never overwrite: a score already here (same id or same name) is
+// kept, and the new one gets a fresh id and a numbered name, "Title (2)".
+async function asNewScore(entry) {
+  const lib = await db.all();
+  if (lib.some((e) => e.id === entry.id)) entry.id = crypto.randomUUID();
+  const titles = new Set(lib.map((e) => e.title));
+  const base = entry.title;
+  for (let n = 2; titles.has(entry.title); n++) entry.title = `${base} (${n})`;
+  return entry;
+}
+
 async function importScore(entry) {
-  await db.put(entry);
+  await db.put(await asNewScore(entry));
   openScore(entry);
 }
 
@@ -472,17 +480,9 @@ async function receiveFromPage() {
 }
 
 async function offerImport(entry) {
-  const existing = (await db.all()).find((e) => e.id === entry.id);
-  const exists = !!existing;
-  // A link carries no photos; keep the ones already here for the same pages.
-  if (!entry.images.length && existing?.images?.length && existing.pages.length === entry.pages.length) {
-    entry.images = existing.images;
-  }
+  await asNewScore(entry);
   const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
-  $("import-question").textContent = exists
-    ? `Replace your copy of “${entry.title}” with the one you were sent (${pages})?`
-    : `Add “${entry.title}” (${pages}) to your scores?`;
-  $("import-yes").textContent = exists ? "Replace" : "Add";
+  $("import-question").textContent = `Add “${entry.title}” (${pages}) to your scores?`;
   $("import-offer").hidden = false;
   $("import-yes").onclick = async () => {
     $("import-offer").hidden = true;

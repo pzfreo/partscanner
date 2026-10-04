@@ -55,11 +55,20 @@ r.restored = { title: got.title, pages: got.pages.length, images: dims, manual: 
 await waitFor(() => document.querySelectorAll(".photo-list .mark").length, 10000, "mark shaded");
 r.markShaded = document.querySelectorAll(".photo-list .mark").length;
 r.tempoShown = $("tempo").value;
-// Receiving it again replaces rather than duplicates.
+// Receiving it again adds a numbered copy; the first is untouched.
 $("back").click(); await sleep(500);
 open(shared);
 await waitFor(() => !$("practice").hidden, 20000, "reopened");
-r.libraryCount = (await idb("readonly", (s) => s.getAll())).length;
+await sleep(300);
+const all = await idb("readonly", (s) => s.getAll());
+r.afterSecondImport = all.map((e) => e.title).sort();
+r.originalKept = all.some((e) => e.id === "hur-1" && e.title === "Huron Carol");
+r.openedTitle = $("title").value;
+// A third time: (3).
+$("back").click(); await sleep(500);
+open(shared);
+await waitFor(() => !$("practice").hidden, 20000, "third");
+r.thirdTitle = $("title").value;
 // Not a score or MusicXML: refused with a message.
 $("back").click(); await sleep(500);
 open(new File(["hello"], "notes.txt", { type: "text/plain" }));

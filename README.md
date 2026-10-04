@@ -41,7 +41,8 @@ then *Add to Home screen*.
   (recognised MusicXML, photos re-encoded as JPEG, settings and marks) and hands
   it to the share sheet (WhatsApp, Drive, email) or downloads it. Browsers only
   share a few file types, hence HTML; opened elsewhere it's a page linking to the
-  app. *Open file* imports it; a score with the same id is replaced. Opened in a
+  app. *Open file* imports it. Imports never overwrite: if the score or its name is
+  already in the library, it's added as "Title (2)" etc. Opened in a
   browser (tapping it in WhatsApp/email), the file shows *Open in Partsong*: it
   opens the app and posts the full score to it (`#receive`); without script the
   button is a link carrying the score minus photos (`#import=…`, gzipped). The

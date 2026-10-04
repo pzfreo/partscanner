@@ -41,9 +41,11 @@ await waitFor(() => g.contentDocument?.getElementById("import-offer") && !g.cont
 r.linkOffer = g.contentDocument.getElementById("import-question").textContent;
 g.contentDocument.getElementById("import-yes").click();
 await waitFor(() => !g.contentDocument.getElementById("practice").hidden, 10000, "link import opened");
-const viaLink = (await scores()).find((e) => e.id === "sent");
-r.viaLink = { keptPhotos: viaLink.images.length, pages: viaLink.pages.length, manual: viaLink.manual, octave: viaLink.octave, count: (await scores()).filter((e) => e.id === "sent").length };
-r.linkKeepsPagesView = !g.contentDocument.getElementById("follow").hidden;
+const all = await scores();
+const copy = all.find((e) => e.title === "Huron (sent) (2)");
+r.viaLink = { images: copy.images.length, pages: copy.pages.length, manual: copy.manual, octave: copy.octave, newId: copy.id !== "sent" };
+r.originalUntouched = all.find((e) => e.id === "sent").images.length === 2;
+r.linkOpensAsRead = !g.contentDocument.getElementById("read-view").hidden;
 // A fresh device (score not present): the link imports without photos.
 const { entryFromLink } = await import("/share.js");
 const fresh = await entryFromLink(link.href.split("#import=")[1]);
