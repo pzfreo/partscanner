@@ -53,7 +53,7 @@ function show(name, nav = "push") {
     endMarkup(false);
     releasePhotos("practice");
     $("photo-list").replaceChildren();
-    $("panel").hidden = true;
+    $("panel").hidden = $("panel-backdrop").hidden = true;
   }
   if (name === "home") renderLibrary();
   if (name !== "home" && nav === "push") history.pushState({ screen: name }, "");
@@ -565,7 +565,7 @@ function openScore(entry, nav = "push") {
   osmdFor = null;
   show("practice", nav);
   // New scans (no part chosen yet) and photo-less scores start with settings open.
-  $("panel").hidden = true;
+  $("panel").hidden = $("panel-backdrop").hidden = true;
   setPanel(!partChosen || !entry.images?.length);
   renderFollow();
   // Pages (photos) when there are any to follow along on; otherwise the read score.
@@ -974,12 +974,41 @@ function setPlaying(on) {
 function setPanel(open, nav = true) {
   const wasOpen = !$("panel").hidden;
   $("panel").hidden = !open;
+  $("panel-backdrop").hidden = !open;
   $("settings").setAttribute("aria-expanded", String(open));
   if (!nav || open === wasOpen) return;
   if (open) history.pushState({ screen: "practice", panel: true }, "");
   else if (history.state?.panel) history.back();
 }
 $("settings").onclick = () => setPanel($("panel").hidden);
+$("panel-close").onclick = () => setPanel(false);
+$("panel-backdrop").onclick = () => setPanel(false);
+
+// Swipe the panel's handle down to close it.
+{
+  let startY = null;
+  const head = $("panel-head");
+  head.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) return;
+    startY = e.clientY;
+    try {
+      head.setPointerCapture(e.pointerId);
+    } catch {}
+  });
+  head.addEventListener("pointermove", (e) => {
+    if (startY == null) return;
+    $("panel").style.transform = `translateY(${Math.max(0, e.clientY - startY)}px)`;
+  });
+  const end = (e) => {
+    if (startY == null) return;
+    const dragged = e.clientY - startY;
+    startY = null;
+    $("panel").style.transform = "";
+    if (dragged > 60) setPanel(false);
+  };
+  head.addEventListener("pointerup", end);
+  head.addEventListener("pointercancel", end);
+}
 
 $("play").onclick = () => {
   if (player.playing) {
