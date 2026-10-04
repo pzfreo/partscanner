@@ -73,5 +73,5 @@ r.thirdTitle = $("title").value;
 $("back").click(); await sleep(500);
 open(new File(["hello"], "notes.txt", { type: "text/plain" }));
 await sleep(500);
-r.badFile = $("library-empty").textContent;
+r.badFile = $("library-status").textContent;
 window.result = r;

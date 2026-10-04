@@ -325,6 +325,7 @@ async function renderLibrary() {
   const lib = await db.all().catch(() => []);
   releasePhotos("library");
   $("library-empty").hidden = lib.length > 0;
+  document.querySelector("#home .report-link .try-sample").hidden = lib.length === 0; // the big button shows instead
   $("library").replaceChildren(
     ...lib
       .slice()
@@ -471,6 +472,23 @@ function loadScan(images = [], xmls = [], id = null, created = null, title = "")
 }
 
 $("new-scan").onclick = () => (reading ? show("scan") : loadScan());
+
+// The sample score (samples/joyful-joyful.pdf, made by scripts/make-sample.py):
+// opens the scan screen with its pages added, ready for Read music.
+async function trySample() {
+  if (reading) return show("scan");
+  loadScan();
+  $("scan-name").value = "Joyful, Joyful (sample)";
+  setPageStatus("Opening the sample…");
+  try {
+    const blob = await (await fetch("samples/joyful-joyful.pdf")).blob();
+    await addFiles([new File([blob], "Joyful, Joyful (sample).pdf", { type: "application/pdf" })]);
+    setPageStatus("Tap Read music to read the sample.");
+  } catch (e) {
+    setPageStatus(`Couldn't open the sample: ${e.message}`);
+  }
+}
+for (const b of document.querySelectorAll(".try-sample")) b.onclick = trySample;
 
 function resumeScan(entry) {
   if (reading) return show("scan");
@@ -684,8 +702,7 @@ async function openFiles(files) {
     const title = parsePage(xmls[0]).title || name || "Imported score";
     await importScore({ id: crypto.randomUUID(), title, created: Date.now(), pages: xmls, images: [] });
   } catch (err) {
-    $("library-empty").hidden = false;
-    $("library-empty").textContent = `Couldn't open that file: ${err.message}`;
+    $("library-status").textContent = `Couldn't open that file: ${err.message}`;
   }
 }
 

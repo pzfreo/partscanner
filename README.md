@@ -70,6 +70,13 @@ then *Add to Home screen*.
   now" snoozes it for a month. Installed apps rarely restart, so the app checks
   for a newer deploy (the version stamped into index.html) when it comes back to
   the screen and every 30 minutes, and offers an Update banner.
+- **Sample score** (*Try a sample score*): `samples/joyful-joyful.pdf`, two pages,
+  *Joyful, Joyful, We Adore Thee* (Beethoven / Henry van Dyke, both public
+  domain) in a new four-part harmonisation dedicated to the public domain (CC0).
+  `scripts/make-sample.py` writes the MusicXML; `scripts/render-sample.mjs`
+  engraves it with Verovio via `samples/render.html` and prints the PDF.
+  `tests/drive-sample.js` reads the PDF in the app and checks every note against
+  the source (currently 100% for all four parts).
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from

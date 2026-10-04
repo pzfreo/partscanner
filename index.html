@@ -46,6 +46,7 @@
         <li><a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener">pdf.js</a> (Apache-2.0)</li>
         <li><a href="https://opensheetmusicdisplay.org" target="_blank" rel="noopener">OpenSheetMusicDisplay</a> (BSD-3-Clause)</li>
       </ul>
+      <p>The sample score, <em>Joyful, Joyful, We Adore Thee</em> (Beethoven, words Henry van Dyke), is a new harmonisation in the public domain (CC0), engraved with <a href="https://www.verovio.org" target="_blank" rel="noopener">Verovio</a>.</p>
       <p>Problems or ideas: <a href="mailto:bugs@partsong.app">bugs@partsong.app</a></p>
       <div class="actions"><button id="about-close" class="primary">Close</button></div>
     </div>
@@ -91,8 +92,12 @@
       </div>
       <p id="library-status" class="muted share-status" aria-live="polite"></p>
       <ul id="library" class="library"></ul>
-      <p id="library-empty" class="muted">Nothing scanned yet. Photograph each page of a score, then pick the part you want to learn.</p>
-      <p class="report-link"><button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
+      <div id="library-empty">
+        <p class="muted">Nothing scanned yet. Photograph each page of a score, then pick the part you want to learn.</p>
+        <p class="muted">Or try it out with a sample: <em>Joyful, Joyful, We Adore Thee</em>, two pages for four voices.</p>
+        <button class="primary try-sample">Try a sample score</button>
+      </div>
+      <p class="report-link"><button class="link try-sample">Try a sample score</button> · <button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
     </section>
 
     <section id="scan" hidden>
