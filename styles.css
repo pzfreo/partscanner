@@ -105,6 +105,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .name-field { display: grid; gap: 4px; margin-top: 16px; font-size: 0.95rem; }
 .name-field input { min-height: 44px; font: inherit; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .status { margin-top: 16px; white-space: pre-line; }
+.discard { margin-top: 24px; color: var(--muted); }
 .status progress { width: 100%; height: 8px; }
 
 .title-wrap { display: flex; align-items: center; gap: 8px; color: var(--muted); }

@@ -45,6 +45,10 @@ then *Add to Home screen*.
   each thumbnail also has a ↻ button.
 - **Navigation**: screens and the settings panel are history entries, so the
   phone's back button steps back through the app instead of closing it.
+- **Interrupted reading**: a scan is saved to the library as each page is read.
+  If Android pauses or kills the tab, the app resumes from the next page when
+  reopened (or from the library's "Reading… n of m" entry). The screen is kept
+  awake while reading (Screen Wake Lock).
 - **Library** (`db.js`): each score is saved on the device in IndexedDB with
   its original photos, the recognised MusicXML and your settings (part, tempo,
   mix), so it opens instantly without re-reading. MusicXML files can be opened
@@ -77,6 +81,8 @@ node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" ou
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-manual.js shot
+node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 700 tests/drive-resume.js shot
+node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-resume-manual.js shot
 ```
 
 ## Deploy

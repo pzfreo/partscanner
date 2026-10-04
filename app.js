@@ -70,7 +70,10 @@ async function renderLibrary() {
       .map((entry) => {
         const li = document.createElement("li");
         const b = document.createElement("button");
-        b.innerHTML = `<span class="thumb"></span><span class="name"></span><small>${entry.pages.length} page${entry.pages.length > 1 ? "s" : ""}</small>`;
+        const n = entry.pages.length;
+        const done = entry.pages.filter(Boolean).length;
+        const info = entry.pending ? `Reading… ${done} of ${n}` : `${n} page${n > 1 ? "s" : ""}`;
+        b.innerHTML = `<span class="thumb"></span><span class="name"></span><small>${info}</small>`;
         b.querySelector(".name").textContent = entry.title;
         if (entry.images?.length) {
           const img = document.createElement("img");
@@ -78,7 +81,7 @@ async function renderLibrary() {
           img.src = photoUrl("library", entry.images[0]);
           b.querySelector(".thumb").append(img);
         }
-        b.onclick = () => openScore(entry);
+        b.onclick = () => (entry.pending ? resumeScan(entry) : openScore(entry));
         li.append(b);
         return li;
       }),
@@ -135,15 +138,73 @@ function setPageStatus(s) {
   setEngineStatus(engineStatus);
 }
 
-$("new-scan").onclick = () => {
+// The scan being read is saved to the library page by page (pending: true),
+// so if Android pauses or kills the tab, reading resumes from the next page.
+let scanId = null;
+let scanCreated = null;
+let reading = false;
+
+function loadScan(images = [], xmls = [], id = null, created = null, title = "") {
   pages.forEach((p) => URL.revokeObjectURL(p.url));
-  pages = [];
+  pages = images.map((blob, i) => ({ blob, url: URL.createObjectURL(blob), xml: xmls[i] ?? undefined }));
+  scanId = id;
+  scanCreated = created;
   pageStatus = "";
-  $("scan-name").value = "";
+  $("scan-name").value = title;
   renderPages();
   show("scan");
   startWorker();
+}
+
+$("new-scan").onclick = () => (reading ? show("scan") : loadScan());
+
+function resumeScan(entry) {
+  if (reading) return show("scan");
+  loadScan(entry.images, entry.pages, entry.id, entry.created, entry.title);
+  readScan();
+}
+
+// On launch, carry on with a scan that was interrupted, unless it has already
+// been resumed twice without progress (e.g. the phone keeps running out of memory).
+async function resumeUnfinished() {
+  const entry = (await db.all().catch(() => [])).find((e) => e.pending);
+  if (!entry || (entry.resumes ?? 0) >= 2) return;
+  await db.update(entry.id, { resumes: (entry.resumes ?? 0) + 1 }).catch(() => {});
+  resumeScan(entry);
+}
+
+function scanEntry(pending) {
+  return {
+    id: scanId,
+    title: $("scan-name").value.trim() || `Scan ${new Date().toLocaleDateString()}`,
+    created: scanCreated,
+    images: pages.map((p) => p.blob),
+    pages: pages.map((p) => p.xml ?? null),
+    pending,
+  };
+}
+
+$("discard-scan").onclick = async () => {
+  if (reading) return;
+  if (scanId) await db.remove(scanId).catch(() => {});
+  loadScan();
+  goHome();
 };
+
+// Keeps the screen on while reading; the lock lapses when the app is hidden,
+// so it's taken again on return.
+function keepAwake() {
+  let lock = null;
+  const acquire = async () => {
+    if (document.visibilityState === "visible") lock = await navigator.wakeLock?.request("screen").catch(() => null);
+  };
+  document.addEventListener("visibilitychange", acquire);
+  acquire();
+  return () => {
+    document.removeEventListener("visibilitychange", acquire);
+    lock?.release().catch(() => {});
+  };
+}
 
 async function addPage(image) {
   const blob = await uprightPhoto(image);
@@ -205,6 +266,7 @@ function renderPages() {
       li.querySelector("img").src = p.url;
       li.querySelector(".rotate").onclick = async () => {
         p.blob = await rotateBlob(p.blob, 90);
+        delete p.xml;
         URL.revokeObjectURL(p.url);
         p.url = URL.createObjectURL(p.blob);
         renderPages();
@@ -240,42 +302,46 @@ function recognisePage(image) {
   });
 }
 
-$("recognise").onclick = async () => {
+$("recognise").onclick = () => readScan();
+
+async function readScan() {
+  if (reading) return;
+  reading = true;
   $("recognise").disabled = true;
-  const xmls = [];
+  const release = keepAwake();
+  scanId ??= crypto.randomUUID();
+  scanCreated ??= Date.now();
+  let saved = await db.put(scanEntry(true)).then(() => true, () => false);
   try {
     startWorker();
     await workerReady;
     const t0 = performance.now();
     for (let i = 0; i < pages.length; i++) {
+      if (pages[i].xml) continue;
       pageLabel = `Page ${i + 1} of ${pages.length}`;
       setPageStatus("finding staves…");
-      xmls.push(await recognisePage(await normalise(pages[i].blob)));
+      pages[i].xml = await recognisePage(await normalise(pages[i].blob));
+      if (saved) await db.update(scanId, { pages: pages.map((p) => p.xml ?? null), resumes: 0 }).catch(() => {});
     }
     pageLabel = "";
     setPageStatus(`Done in ${Math.round((performance.now() - t0) / 1000)} s`);
   } catch (e) {
     pageLabel = "";
-    setPageStatus(`Couldn't read ${xmls.length ? `page ${xmls.length + 1}` : "the music"}: ${e.message}`);
+    setPageStatus(`Couldn't read page ${pages.findIndex((p) => !p.xml) + 1}: ${e.message}`);
     $("recognise").disabled = false;
     return;
+  } finally {
+    reading = false;
+    release();
   }
-  const entry = {
-    id: crypto.randomUUID(),
-    title: $("scan-name").value.trim() || `Scan ${new Date().toLocaleDateString()}`,
-    created: Date.now(),
-    pages: xmls,
-    images: pages.map((p) => p.blob),
-  };
-  try {
-    await db.put(entry);
-  } catch (e) {
-    setPageStatus(`Read OK, but couldn't save it on this phone (${e?.name || e}).`);
-  }
+  const entry = scanEntry(false);
+  saved = await db.put(entry).then(() => true, () => false);
+  if (!saved) setPageStatus("Read OK, but couldn't save it on this phone (storage full?).");
+  scanId = null;
   // If they've gone back to the library meanwhile, it's just added there.
   if (!$("scan").hidden) openScore(entry, "replace");
   else renderLibrary();
-};
+}
 
 $("open-xml").onchange = async (e) => {
   const files = [...e.target.files];
@@ -790,4 +856,4 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost") {
   navigator.serviceWorker.register("sw.js");
 }
 
-renderLibrary();
+renderLibrary().then(resumeUnfinished);
