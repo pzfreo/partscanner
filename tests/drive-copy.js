@@ -1,4 +1,4 @@
-// Make a copy: same photos/music/marks/settings, unlocked, numbered name,
+// Make a copy (from the library list): same photos/music/marks/settings, unlocked, numbered name,
 // title ready to rename; original untouched; back goes to the library.
 // Seeds a marked, locked Huron. Run against http://localhost:8765/index.html.
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -9,13 +9,13 @@ const pages = await Promise.all([0, 1].map((i) => fetch(`/testdata/huron_${i}.mu
 const images = await Promise.all([0, 1].map((i) => fetch(`/testdata/huron_${i}.png`).then((r) => r.blob())));
 await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onupgradeneeded = () => q.result.createObjectStore("scores", { keyPath: "id" }); q.onsuccess = () => { const tx = q.result.transaction("scores", "readwrite"); tx.objectStore("scores").put({ id: "orig", title: "Huron", created: 1, pages, images, manual: { 0: 1, 4: 1 }, octave: 0, tempo: 90, locked: true }); tx.oncomplete = res; }; });
 $("new-scan").click(); history.back(); await sleep(400);
-await waitFor(() => document.querySelector("#library button"), 5000, "library").then((b) => b.click());
-await sleep(500);
-$("settings").click(); await sleep(300);
-$("copy-score").click();
+await shot(false);
+await waitFor(() => document.querySelector("#library button"), 5000, "library");
+const r0 = { rowButtons: [...document.querySelector("#library li").querySelectorAll("button")].map((b) => b.getAttribute("aria-label") || "row") };
+document.querySelector('#library button[aria-label="Make a copy of Huron"]').click();
 await waitFor(() => $("title").value === "Huron (2)", 5000, "copy opened");
 await sleep(400);
-const r = {};
+const r = { ...r0 };
 r.copyOpen = { title: $("title").value, titleSelected: document.activeElement === $("title") && $("title").selectionEnd - $("title").selectionStart === $("title").value.length, panelClosed: $("panel").hidden, editable: !$("title").readOnly, status: $("share-status").textContent };
 // Rename it and change its marks; the original must not change.
 $("title").value = "Huron S2"; $("title").dispatchEvent(new Event("change"));

@@ -13,8 +13,8 @@ await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onupg
 $("new-scan").click(); history.back(); await sleep(500);
 await waitFor(() => document.querySelectorAll("#library li").length === 2, 5000, "library");
 const r = {};
-r.shareButtons = document.querySelectorAll("#library .share-btn").length;
-const btn = document.querySelector("#library .share-btn");
+r.shareButtons = document.querySelectorAll('#library button[aria-label^="Share"]').length;
+const btn = document.querySelector('#library button[aria-label^="Share"]');
 const row = btn.closest("li").getBoundingClientRect(), b = btn.getBoundingClientRect();
 r.iconInsideRow = b.right <= row.right + 1 && b.left > row.left;
 await shot(false);

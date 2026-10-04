@@ -49,7 +49,7 @@ then *Add to Home screen*.
   app always asks before adding. The installed
   app is also a share target (manifest `share_target` → service worker inbox):
   shared score files open, shared PDFs/photos start a new scan.
-- **Make a copy** (settings): duplicates a score with its photos, marks and
+- **Make a copy** (copy icon on each library row): duplicates a score with its photos, marks and
   settings, e.g. to mark first and second sopranos as separate scores.
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).

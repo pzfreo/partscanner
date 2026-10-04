@@ -75,6 +75,9 @@ window.addEventListener("popstate", (e) => {
   } else show("home", "none");
 });
 
+const COPY_ICON =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+
 async function renderLibrary() {
   const lib = await db.all().catch(() => []);
   releasePhotos("library");
@@ -100,14 +103,21 @@ async function renderLibrary() {
         b.onclick = () => (entry.pending ? resumeScan(entry) : openScore(entry));
         li.append(b);
         if (!entry.pending) {
+          const copy = document.createElement("button");
+          copy.className = "share-btn";
+          copy.setAttribute("aria-label", `Make a copy of ${entry.title}`);
+          copy.title = "Make a copy";
+          copy.innerHTML = COPY_ICON;
+          copy.onclick = () => copyScore(entry.id);
           const share = document.createElement("button");
           share.className = "share-btn";
           share.setAttribute("aria-label", `Share ${entry.title}`);
+          share.title = "Share";
           share.innerHTML = $("share").innerHTML;
           share.onclick = () => shareScore(entry.id, share, $("library-status"));
-          li.append(share);
+          li.append(copy, share);
         } else {
-          li.append(Object.assign(document.createElement("span"), { className: "share-spacer" }));
+          for (let i = 0; i < 2; i++) li.append(Object.assign(document.createElement("span"), { className: "share-spacer" }));
         }
         return li;
       }),
@@ -449,29 +459,18 @@ async function shareScore(id, button, status) {
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
 
-// A copy of the open score (photos, music, marks, settings), unlocked, named
-// "Title (2)" and opened with its title selected for renaming.
-$("copy-score").onclick = async () => {
-  const original = (await db.all()).find((e) => e.id === current.id) ?? current;
+// A copy of a score (photos, music, marks, settings), unlocked, named
+// "Title (2)" and opened with its title selected for renaming, e.g. to mark up
+// first and second sopranos as separate scores.
+async function copyScore(id) {
+  const original = (await db.all()).find((e) => e.id === id);
   const copy = await asNewScore({ ...original, id: crypto.randomUUID(), created: Date.now(), locked: false });
   await db.put(copy);
-  // Close the panel (one step back in history) first, then swap this score's
-  // history entry for the copy, so back still goes to the library.
-  const show = () => {
-    openScore(copy, "replace");
-    $("title").focus();
-    $("title").select();
-    $("share-status").textContent = "Copy made. Give it a new name.";
-  };
-  if (history.state?.panel) {
-    addEventListener("popstate", show, { once: true });
-    setPanel(false);
-  } else {
-    setPanel(false, false);
-    show();
-  }
-};
-
+  openScore(copy);
+  $("title").focus();
+  $("title").select();
+  $("share-status").textContent = "Copy made. Give it a new name.";
+}
 
 // A score handed over by a .partsong.html file opened in the browser (from
 // WhatsApp, email…): either posted by the page that opened us (#receive, with
