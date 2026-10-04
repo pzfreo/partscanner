@@ -36,7 +36,8 @@ then *Add to Home screen*.
   with OpenSheetMusicDisplay (to spot recognition errors). Both follow along
   (bar highlight + playhead; the note marker and marking are on Pages) and take
   a tap on a bar as the start. Imported MusicXML opens on As read.
-- **Sharing** (`share.js`): *Share this score* makes one `.partsong.html` file
+- **Sharing** (`share.js`): the share icon (by the score title, or on each
+  library row) makes one `.partsong.html` file
   (recognised MusicXML, photos re-encoded as JPEG, settings and marks) and hands
   it to the share sheet (WhatsApp, Drive, email) or downloads it. Browsers only
   share a few file types, hence HTML; opened elsewhere it's a page linking to the
@@ -99,6 +100,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-views.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-read-follow.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-share.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-library-share.js shot
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 180 tests/drive-share-target.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-hidden.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot

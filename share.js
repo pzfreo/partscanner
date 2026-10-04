@@ -87,7 +87,8 @@ export function parseScoreFile(text) {
   };
 }
 
-// Android share sheet where available; otherwise a download.
+// Android share sheet where available; otherwise a download. "retry" means
+// the share sheet needs a fresh tap (browsers only allow it shortly after one).
 export async function shareFile(file, title) {
   if (navigator.canShare?.({ files: [file] })) {
     try {
@@ -95,6 +96,7 @@ export async function shareFile(file, title) {
       return "shared";
     } catch (e) {
       if (e.name === "AbortError") return "cancelled";
+      if (e.name === "NotAllowedError") return "retry";
     }
   }
   const a = document.createElement("a");

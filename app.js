@@ -99,6 +99,16 @@ async function renderLibrary() {
         }
         b.onclick = () => (entry.pending ? resumeScan(entry) : openScore(entry));
         li.append(b);
+        if (!entry.pending) {
+          const share = document.createElement("button");
+          share.className = "share-btn";
+          share.setAttribute("aria-label", `Share ${entry.title}`);
+          share.innerHTML = $("share").innerHTML;
+          share.onclick = () => shareScore(entry.id, share, $("library-status"));
+          li.append(share);
+        } else {
+          li.append(Object.assign(document.createElement("span"), { className: "share-spacer" }));
+        }
         return li;
       }),
   );
@@ -399,20 +409,38 @@ async function importScore(entry) {
   openScore(entry);
 }
 
-$("share").onclick = async () => {
-  $("share").disabled = true;
-  $("share-status").textContent = "Preparing…";
+// Shares a library score. Preparing the file can outlast the browser's
+// "just tapped" window for the share sheet; then the file is kept and the
+// next tap shares it straight away.
+let prepared = null; // { id, file, title }
+async function shareScore(id, button, status) {
+  button.disabled = true;
   try {
-    const entry = (await db.all()).find((e) => e.id === current.id) ?? current;
-    const how = await shareFile(await scoreFile(entry), entry.title);
-    $("share-status").textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "" }[how];
+    if (prepared?.id !== id) {
+      status.textContent = "Preparing…";
+      const entry = (await db.all()).find((e) => e.id === id);
+      prepared = { id, file: await scoreFile(entry), title: entry.title };
+    }
+    const how = await shareFile(prepared.file, prepared.title);
+    if (how !== "retry") prepared = null;
+    status.textContent = {
+      shared: "Shared.",
+      downloaded: "Saved to Downloads.",
+      cancelled: "",
+      retry: "Ready. Tap share again.",
+    }[how];
   } catch (e) {
-    $("share-status").textContent = `Couldn't share: ${e.message}`;
+    prepared = null;
+    status.textContent = `Couldn't share: ${e.message}`;
   } finally {
-    $("share").disabled = false;
-    setTimeout(() => ($("share-status").textContent = ""), 4000);
+    button.disabled = false;
+    clearTimeout(shareScore.timer);
+    if (!prepared) shareScore.timer = setTimeout(() => (status.textContent = ""), 4000);
   }
-};
+}
+
+$("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
+
 
 // Files shared to the installed app arrive via the service worker's inbox.
 async function openInbox() {
