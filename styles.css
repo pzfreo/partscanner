@@ -199,7 +199,11 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .controls input[type="range"] { width: 100%; accent-color: var(--accent); }
 .bars { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
 .bars input[type="number"] { width: 72px; min-height: 40px; font: inherit; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
-.bars .check { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+.bars .check, .repeats .check { display: flex; align-items: center; gap: 6px; min-height: 40px; }
+.repeats { margin-top: 12px; }
+.repeats ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.repeats li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.95rem; }
+.repeats input[type="number"] { width: 72px; min-height: 40px; font: inherit; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 
 /* Practice screen: music fills the page; transport is fixed at the bottom and
    the detailed controls slide up above it. */

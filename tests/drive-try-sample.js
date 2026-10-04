@@ -16,6 +16,7 @@ const rows = [...document.querySelectorAll("#lines li")];
 r.read = {
   title: $("title").value, bars: $("to-bar").value,
   parts: rows.map((li) => `${li.querySelector(".pick span").textContent}${li.querySelector(".include input").checked ? "" : " (off)"}${li.querySelector('input[type="radio"]').checked ? " *" : ""}`),
+  repeats: [...$("repeat-list").children].map((li) => `${li.querySelector("span").textContent} -> ${li.querySelector("input").value}`),
   tenor: rows.find((li) => li.querySelector(".pick span").textContent === "Tenor")?.querySelector(".range").textContent,
 };
 history.back(); history.back(); await sleep(600);

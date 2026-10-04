@@ -80,12 +80,43 @@ export function parsePage(xmlText) {
         }
         maxPos = Math.max(maxPos, pos);
       }
-      return { notes, length: maxPos || timeLength };
+      return { notes, length: maxPos || timeLength, ...repeatMarks(measure) };
     });
     for (let staff = 1; staff <= staves; staff++) placeNoteheads(measures, staff);
     return { staves, measures, clef };
   });
   return { title, parts };
+}
+
+// Repeat signs and 1st/2nd-time endings on a bar's barlines. (homr puts a
+// forward repeat on the right-hand barline of the bar it starts, so go by
+// direction, not location.)
+function repeatMarks(measure) {
+  const marks = { repeatForward: false, repeatBackward: false, endingStart: [], endingStop: false };
+  for (const b of measure.querySelectorAll(":scope > barline")) {
+    const dir = b.querySelector("repeat")?.getAttribute("direction");
+    if (dir === "forward") marks.repeatForward = true;
+    if (dir === "backward") marks.repeatBackward = true;
+    const ending = b.querySelector("ending");
+    const type = ending?.getAttribute("type");
+    if (type === "start") marks.endingStart = (ending.getAttribute("number") ?? "1").split(/[\s,]+/).filter(Boolean).map(Number);
+    if (type === "stop" || type === "discontinue") marks.endingStop = true;
+  }
+  return marks;
+}
+
+// Keeps a dropped or merged bar's repeat marks: ends of sections go to the bar
+// before it, starts to the bar after it.
+function carryMarks(from, before, after) {
+  if (before) {
+    before.repeatBackward ||= from.repeatBackward;
+    before.endingStop ||= from.endingStop;
+  }
+  const to = after ?? before;
+  if (to) {
+    to.repeatForward ||= from.repeatForward;
+    if (from.endingStart.length && !to.endingStart.length) to.endingStart = from.endingStart;
+  }
 }
 
 // homr's note positions come from where its model was looking, so they wander
@@ -244,7 +275,13 @@ function alignBars(page) {
     // are reading artefacts: drop those first.
     let extra = part.measures.length - mode;
     if (extra <= 0) continue;
-    part.measures = part.measures.filter((m) => m.notes.length || extra-- <= 0);
+    const ms = part.measures;
+    part.measures = ms.filter((m, i) => {
+      if (m.notes.length || extra <= 0) return true;
+      extra--;
+      carryMarks(m, ms.slice(0, i).findLast((x) => x.notes.length), ms.slice(i + 1).find((x) => x.notes.length));
+      return false;
+    });
     const out = [];
     for (const m of part.measures) {
       const prev = out.at(-1);
@@ -255,10 +292,60 @@ function alignBars(page) {
         extra--;
         prev.notes.push(...m.notes.map((n) => ({ ...n, start: n.start + prev.length })));
         prev.length += m.length;
+        carryMarks(m, prev, null);
       } else out.push({ ...m, notes: [...m.notes] });
     }
     part.measures = out;
   }
+}
+
+// Which bars belong to a 1st/2nd-time ending (bar.ending = [1] etc.), and where
+// each backward repeat goes back to (bar.repeatTo, an index): the last forward
+// repeat since the previous backward repeat, else the bar after that (or the
+// start). The reader can miss a forward repeat, so the app lets you change it.
+function markRepeats(measures) {
+  let ending = null;
+  let sectionStart = 0;
+  measures.forEach((m, i) => {
+    if (m.endingStart.length) ending = m.endingStart;
+    else if (m.repeatForward) ending = null;
+    if (ending) m.ending = ending;
+    if (m.repeatForward) sectionStart = i;
+    if (m.repeatBackward) {
+      m.repeatTo = sectionStart;
+      sectionStart = i + 1;
+    }
+    if (m.endingStop) ending = null;
+  });
+}
+
+// The order bars are played in from bar index `from` to `to` (inclusive):
+// each backward repeat inside the range is taken once (back to `repeatTo`, or
+// `targets[index]` if set, but not before `from`), and on the second time
+// through, bars of a 1st-time ending are skipped for the 2nd-time ones.
+export function playOrder(measures, from, to, targets = {}) {
+  const order = [];
+  const taken = new Set();
+  let pass = 1;
+  let jumpedAt = -1;
+  for (let i = from; i <= to && order.length < 10 * measures.length; ) {
+    const m = measures[i];
+    if (pass === 2 && i > jumpedAt && !m.ending) pass = 1;
+    if (m.ending && !m.ending.includes(pass)) {
+      i++;
+      continue;
+    }
+    order.push(i);
+    if (m.repeatBackward && !taken.has(i)) {
+      taken.add(i);
+      pass = 2;
+      jumpedAt = i;
+      i = Math.min(i, Math.max(from, targets[i] ?? m.repeatTo ?? 0));
+      continue;
+    }
+    i++;
+  }
+  return order;
 }
 
 // pages: array of parsePage() results, in page order.
@@ -288,10 +375,18 @@ export function buildScore(pages) {
     for (let i = 0; i < count; i++) {
       const length = Math.max(...page.parts.map((p) => p.measures[i]?.length ?? 0)) || 2;
       // sheet/sheetBar: which page's MusicXML, and which bar in it (for the As read view)
-      measures.push({ number: measures.length + 1, start: t, length, sheet, sheetBar: i });
+      const marks = page.parts.map((p) => p.measures[i]).filter(Boolean);
+      measures.push({
+        number: measures.length + 1, start: t, length, sheet, sheetBar: i,
+        repeatForward: marks.some((m) => m.repeatForward),
+        repeatBackward: marks.some((m) => m.repeatBackward),
+        endingStart: [...new Set(marks.flatMap((m) => m.endingStart))],
+        endingStop: marks.some((m) => m.endingStop),
+      });
       t += length;
     }
   });
+  markRepeats(measures);
 
   // Where each bar sits on its photo: a box around its notes, and the x of
   // each onset so a playhead can move through it.

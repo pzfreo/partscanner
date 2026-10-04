@@ -5,7 +5,7 @@
 // keep the app's original name, Part Scanner, so older files still open.)
 
 const FORMAT = "partscanner-score";
-const SETTINGS = ["mine", "excluded", "manual", "octave", "tempo", "others", "locked"];
+const SETTINGS = ["mine", "excluded", "manual", "octave", "tempo", "others", "locked", "repeats", "playRepeats"];
 const PHOTO_QUALITY = 0.85;
 
 async function toBase64(blob) {

@@ -33,28 +33,45 @@ export class Player {
   }
 
   setTempo(bpm) {
-    const pos = this.playing ? this.position() : null;
+    const at = this.playing ? this.offset() : null;
     this.bpm = bpm;
-    if (pos != null) this.play(pos, this.loopEnd, this.loop, this.loopStart);
+    if (at != null) this.play(this.segments, at, this.loop);
   }
 
-  // Current position in quarter notes.
+  // Playback runs through `segments`, stretches of the score in quarter notes
+  // ({from, to}), in order: with repeats, the same stretch can come twice.
+  // offset() is how far into them playback is; position() is where that is
+  // in the score.
+  offset() {
+    if (!this.playing) return this.startOffset ?? 0;
+    return this.startOffset + ((this.ctx.currentTime - this.startTime) * this.bpm) / 60;
+  }
+
   position() {
-    if (!this.playing) return this.startBeat ?? 0;
-    return this.startBeat + ((this.ctx.currentTime - this.startTime) * this.bpm) / 60;
+    // Not before the start: during the short lead-in, offset() is slightly
+    // less, which after a repeat would point at the end of the previous pass.
+    const o = Math.max(this.startOffset ?? 0, this.offset());
+    const seg = this.segments?.findLast((s) => s.at <= o + 1e-6) ?? this.segments?.[0];
+    if (!seg) return 0;
+    return Math.min(seg.to, seg.from + Math.max(0, o - seg.at));
   }
 
-  play(fromBeat = 0, toBeat = this.score.length, loop = false, loopStart = fromBeat) {
+  play(segments, startOffset = 0, loop = false) {
     this.ensureContext();
     this.stop(false);
     this.ctx.resume();
+    let at = 0;
+    this.segments = segments.map((s) => {
+      const seg = { ...s, at };
+      at += s.to - s.from;
+      return seg;
+    });
+    this.total = at;
     this.playing = true;
     this.loop = loop;
-    this.loopStart = loopStart;
-    this.loopEnd = toBeat;
-    this.startBeat = fromBeat;
+    this.startOffset = startOffset;
     this.startTime = this.ctx.currentTime + 0.1;
-    this.scheduledUntil = fromBeat;
+    this.scheduledUntil = startOffset;
     this.timer = setInterval(() => this.schedule(), TICK_MS);
     this.schedule();
     // A failing display update must not stop the loop (or the counter freezes).
@@ -72,6 +89,7 @@ export class Player {
 
   stop(notify = true) {
     if (!this.playing) return;
+    this.startOffset = this.offset();
     this.playing = false;
     clearInterval(this.timer);
     cancelAnimationFrame(this.raf);
@@ -82,31 +100,35 @@ export class Player {
 
   schedule() {
     const secPerBeat = 60 / this.bpm;
-    const horizon = this.startBeat + (this.ctx.currentTime + LOOKAHEAD - this.startTime) / secPerBeat;
+    const horizon = this.startOffset + (this.ctx.currentTime + LOOKAHEAD - this.startTime) / secPerBeat;
     const from = this.scheduledUntil;
-    const to = Math.min(horizon, this.loopEnd);
+    const to = Math.min(horizon, this.total);
     if (to > from) {
-      this.score.lines.forEach((line, i) => {
-        for (const n of line.notes) {
-          if (n.t >= from && n.t < to) {
-            const dur = Math.min(n.dur, this.loopEnd - n.t);
+      for (const seg of this.segments) {
+        if (seg.at + (seg.to - seg.from) <= from || seg.at >= to) continue;
+        this.score.lines.forEach((line, i) => {
+          for (const n of line.notes) {
+            if (n.t < seg.from || n.t >= seg.to) continue;
+            const o = seg.at + (n.t - seg.from);
+            if (o < from || o >= to) continue;
+            const dur = Math.min(n.dur, seg.to - n.t);
             const { gain, shift = 0 } = this.mix(i, n.t);
-            const when = this.startTime + (n.t - this.startBeat) * secPerBeat;
+            const when = this.startTime + (o - this.startOffset) * secPerBeat;
             if (gain > 0 && when >= this.ctx.currentTime - MAX_LATE) {
               this.note(n.midi + shift, gain, when, dur * secPerBeat);
             }
           }
-        }
-      });
+        });
+      }
       this.scheduledUntil = to;
     }
-    if (horizon >= this.loopEnd) {
+    if (horizon >= this.total) {
       if (this.loop) {
-        // Restart the timeline so the loop start lands exactly at the loop end.
-        this.startTime += (this.loopEnd - this.startBeat) * secPerBeat;
-        this.startBeat = this.loopStart;
-        this.scheduledUntil = this.loopStart;
-      } else if (this.ctx.currentTime > this.startTime + (this.loopEnd - this.startBeat) * secPerBeat) {
+        // Restart the timeline so the start lands exactly at the end.
+        this.startTime += (this.total - this.startOffset) * secPerBeat;
+        this.startOffset = 0;
+        this.scheduledUntil = 0;
+      } else if (this.ctx.currentTime > this.startTime + (this.total - this.startOffset) * secPerBeat) {
         this.stop();
       }
     }

@@ -1,4 +1,4 @@
-import { buildScore, parsePage } from "./score.js";
+import { buildScore, parsePage, playOrder } from "./score.js";
 import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
@@ -463,11 +463,14 @@ let scanId = null;
 let scanCreated = null;
 let reading = false;
 
+let scanSettings = {}; // settings to save with the scan (the sample's)
+
 function loadScan(images = [], xmls = [], id = null, created = null, title = "") {
   pages.forEach((p) => URL.revokeObjectURL(p.url));
   pages = images.map((blob, i) => ({ blob, url: URL.createObjectURL(blob), xml: xmls[i] ?? undefined }));
   scanId = id;
   scanCreated = created;
+  scanSettings = {};
   pageStatus = "";
   $("scan-name").value = title;
   renderPages();
@@ -492,6 +495,8 @@ async function trySample() {
   if (reading) return show("scan");
   loadScan();
   $("scan-name").value = "If ye love me (sample)";
+  // The reader misses the forward repeat at the start of bar 14.
+  scanSettings = { repeats: { 26: 14 } };
   setPageStatus("Opening the sample…");
   try {
     const blob = await (await fetch("samples/tallis-if-ye-love-me.pdf")).blob();
@@ -526,6 +531,7 @@ function scanEntry(pending) {
     images: pages.map((p) => p.blob),
     pages: pages.map((p) => p.xml ?? null),
     pending,
+    ...scanSettings,
   };
 }
 
@@ -889,6 +895,9 @@ function openScore(entry, nav = "push") {
   repairReferences();
   current.octave = entry.octave ?? 0;
   $("octave").value = String(current.octave);
+  current.repeats = entry.repeats ?? {};
+  current.playRepeats = entry.playRepeats ?? true;
+  renderRepeats();
   renderLines();
   renderPartChoice();
   applyLock();
@@ -1248,6 +1257,44 @@ $("lock").onchange = () => {
   applyLock();
 };
 
+// Each repeat the reader found, with the bar it goes back to. A forward repeat
+// at the start of a line is easy to miss, so the start can be corrected here.
+function renderRepeats() {
+  const ends = score.measures.filter((m) => m.repeatBackward);
+  $("repeats").hidden = !ends.length;
+  $("play-repeats").checked = current.playRepeats !== false;
+  $("repeat-list").replaceChildren(
+    ...ends.map((m) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span></span> goes back to bar <input type="number" min="1" inputmode="numeric">`;
+      li.querySelector("span").textContent = `Repeat at bar ${m.number}`;
+      const input = li.querySelector("input");
+      input.max = m.number;
+      input.value = current.repeats[m.number] ?? m.repeatTo + 1;
+      input.disabled = current.playRepeats === false;
+      input.onchange = () => {
+        const bar = Math.min(m.number, Math.max(1, Math.round(Number(input.value)) || m.repeatTo + 1));
+        input.value = bar;
+        current.repeats = { ...current.repeats, [m.number]: bar };
+        updateEntry(current.id, { repeats: current.repeats });
+        restartIfPlaying();
+      };
+      return li;
+    }),
+  );
+}
+$("play-repeats").onchange = () => {
+  current.playRepeats = $("play-repeats").checked;
+  updateEntry(current.id, { playRepeats: current.playRepeats });
+  renderRepeats();
+  restartIfPlaying();
+};
+
+function restartIfPlaying() {
+  resumeAt = null;
+  if (player?.playing) startPlayback();
+}
+
 function renderLines() {
   $("lines").replaceChildren(
     ...score.lines.map((line) => {
@@ -1308,15 +1355,48 @@ $("title").onchange = () => {
   updateEntry(current.id, { title: current.title });
 };
 
-function barRange() {
+function barNumbers() {
   const n = score.measures.length;
   const from = Math.min(Math.max(1, Number($("from-bar").value) || 1), n);
   const to = Math.min(Math.max(from, Number($("to-bar").value) || n), n);
+  return [from, to];
+}
+
+function barRange() {
+  const [from, to] = barNumbers();
   const last = score.measures[to - 1];
   return [score.measures[from - 1].start, last.start + last.length];
 }
 
-let resumeAt = null; // beat to continue from after a pause
+// What to play for the chosen bars: stretches of the score in order, taking
+// repeats (unless switched off) with any corrected repeat starts.
+function playSegments() {
+  const [from, to] = barNumbers();
+  const targets = Object.fromEntries(Object.entries(current.repeats ?? {}).map(([bar, toBar]) => [bar - 1, toBar - 1]));
+  const order = current.playRepeats === false
+    ? Array.from({ length: to - from + 1 }, (_, i) => from - 1 + i)
+    : playOrder(score.measures, from - 1, to - 1, targets);
+  const segments = [];
+  for (const i of order) {
+    const m = score.measures[i];
+    const last = segments.at(-1);
+    if (last && Math.abs(last.to - m.start) < 1e-6) last.to = m.start + m.length;
+    else segments.push({ from: m.start, to: m.start + m.length });
+  }
+  return segments;
+}
+
+// After a pause: where playback stopped (in the score and along the play
+// order), so play carries on from there, including on a repeat's second time.
+let resumeAt = null; // { beat, offset, key }
+const rangeKey = () => JSON.stringify([barNumbers(), current.repeats, current.playRepeats]);
+
+function startPlayback(offset = 0) {
+  // Treat the first bar as new, so it's scrolled into view.
+  followedBar = null;
+  readBar = null;
+  player.play(playSegments(), offset, $("loop").checked);
+}
 
 function setPlaying(on) {
   $("play").classList.toggle("playing", on);
@@ -1365,14 +1445,13 @@ $("panel-backdrop").onclick = () => setPanel(false);
 
 $("play").onclick = () => {
   if (player.playing) {
-    resumeAt = player.position();
     player.stop();
+    resumeAt = { beat: player.position(), offset: player.offset(), key: rangeKey() };
     return;
   }
-  const [from, to] = barRange();
-  const start = resumeAt != null && resumeAt >= from && resumeAt < to ? resumeAt : from;
+  const offset = resumeAt?.key === rangeKey() ? resumeAt.offset : 0;
   resumeAt = null;
-  player.play(start, to, $("loop").checked, from);
+  startPlayback(offset);
   setPlaying(true);
   if (!playTracked) track("play", hasMarks() ? "play (marked)" : "play");
   playTracked = true;
@@ -1381,7 +1460,7 @@ $("play").onclick = () => {
 $("rewind").onclick = () => {
   resumeAt = null;
   const [from, to] = barRange();
-  if (player.playing) player.play(from, to, $("loop").checked);
+  if (player.playing) startPlayback();
   else {
     showBar(from);
     $("position").textContent = `Bar ${barAt(from).number}`;
@@ -1392,7 +1471,7 @@ for (const id of ["from-bar", "to-bar", "loop"]) {
   $(id).onchange = () => {
     resumeAt = null;
     const [from, to] = barRange();
-    if (player.playing) player.play(from, to, $("loop").checked);
+    if (player.playing) startPlayback();
     else {
       showBar(from);
       $("position").textContent = `Bar ${barAt(from).number}`;
@@ -1507,7 +1586,7 @@ function pickReadBar(sheet, e) {
 }
 
 // Where you are: the playing position, else where you paused, else the start bar.
-const currentBeat = () => (player?.playing ? player.position() : resumeAt ?? barRange()[0]);
+const currentBeat = () => (player?.playing ? player.position() : resumeAt?.beat ?? barRange()[0]);
 
 function setView(view) {
   const pages = view === "pages";

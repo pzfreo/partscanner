@@ -70,6 +70,13 @@ then *Add to Home screen*.
   now" snoozes it for a month. Installed apps rarely restart, so the app checks
   for a newer deploy (the version stamped into index.html) when it comes back to
   the screen and every 30 minutes, and offers an Update banner.
+- **Repeats**: repeat signs and 1st/2nd-time endings from homr's barlines
+  (`repeatMarks`, `markRepeats`, `playOrder` in `score.js`); the player plays a
+  list of score stretches in order (`player.js`), so a repeat plays twice and
+  follow-along jumps back. homr can miss a forward repeat at the start of a
+  line, so settings show each repeat's "goes back to bar" (saved per score),
+  plus a *Play repeats* switch. `tests/drive-repeats.js` (needs
+  `testdata/tallis_0..2.musicxml`, the sample as read).
 - **Usage counts**: GoatCounter (partsong.goatcounter.com), cookie-free and
   anonymous: page views plus a few events via `track()` in `app.js` (sample,
   read-ok/read-failed with page count, first play per opened score, share,
