@@ -79,6 +79,7 @@ $("back").onclick = goHome;
 
 window.addEventListener("popstate", (e) => {
   if (!$("report").hidden && !e.state?.report) return closeReport(false);
+  if (!$("about").hidden && !e.state?.about) return closeAbout(false);
   if (e.state?.screen === "practice" && !$("practice").hidden) {
     setPanel(false, false);
     endMarkup(false);
@@ -136,6 +137,20 @@ function closeReport(nav = true) {
   if (nav && history.state?.report) history.back();
 }
 $("report-close").onclick = () => closeReport();
+
+// About: version, privacy, licence (AGPL: the source link is the offer of
+// source to network users) and third-party credits.
+function openAbout() {
+  $("about-version").textContent = VERSION;
+  $("about").hidden = false;
+  history.pushState({ ...history.state, about: true }, "");
+}
+for (const b of document.querySelectorAll(".about-open")) b.onclick = openAbout;
+function closeAbout(nav = true) {
+  $("about").hidden = true;
+  if (nav && history.state?.about) history.back();
+}
+$("about-close").onclick = () => closeAbout();
 
 function reportText() {
   return `${$("report-text").value.trim() || "(no description)"}\n\n---\n${$("report-diag").textContent}`;

@@ -18,6 +18,33 @@
   </header>
 
   <div id="error-toast" class="error-toast" role="alert" hidden></div>
+  <div id="about" class="report-overlay" role="dialog" aria-labelledby="about-heading" hidden>
+    <div class="report-card about-card">
+      <h2 id="about-heading">Partsong <small id="about-version"></small></h2>
+      <p>Scan choral sheet music on your phone and practise your own part, with the other parts quieter.</p>
+      <p>Everything runs on your device: the music is read on the phone, and your scores stay on it unless you share them. No account, no tracking.</p>
+      <h3>Licence</h3>
+      <p>© 2026 Paul Fremantle. Partsong is free software: you can use, study, share and change it under the terms of the
+        <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">GNU Affero General Public License v3.0</a>.
+        It comes with no warranty.</p>
+      <p>Source code: <a href="https://github.com/pzfreo/partsong" target="_blank" rel="noopener">github.com/pzfreo/partsong</a></p>
+      <h3>Built with</h3>
+      <ul class="credits">
+        <li><a href="https://github.com/liebharc/homr" target="_blank" rel="noopener">homr</a> by Christian Liebhardt: reads the music (AGPL-3.0). Its models build on
+          <a href="https://github.com/BreezeWhite/oemer" target="_blank" rel="noopener">oemer</a> (MIT) and
+          <a href="https://github.com/NetEase/Polyphonic-TrOMR" target="_blank" rel="noopener">Polyphonic-TrOMR</a> (Apache-2.0).</li>
+        <li><a href="https://pyodide.org" target="_blank" rel="noopener">Pyodide</a> (MPL-2.0), with
+          <a href="https://numpy.org" target="_blank" rel="noopener">NumPy</a> (BSD-3-Clause),
+          <a href="https://opencv.org" target="_blank" rel="noopener">OpenCV</a> (Apache-2.0) and
+          <a href="https://python-pillow.org" target="_blank" rel="noopener">Pillow</a> (MIT-CMU).</li>
+        <li><a href="https://onnxruntime.ai" target="_blank" rel="noopener">ONNX Runtime Web</a> (MIT)</li>
+        <li><a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener">pdf.js</a> (Apache-2.0)</li>
+        <li><a href="https://opensheetmusicdisplay.org" target="_blank" rel="noopener">OpenSheetMusicDisplay</a> (BSD-3-Clause)</li>
+      </ul>
+      <p>Problems or ideas: <a href="mailto:bugs@partsong.app">bugs@partsong.app</a></p>
+      <div class="actions"><button id="about-close" class="primary">Close</button></div>
+    </div>
+  </div>
   <div id="report" class="report-overlay" role="dialog" aria-labelledby="report-heading" hidden>
     <div class="report-card">
       <h2 id="report-heading">Report a problem</h2>
@@ -53,7 +80,7 @@
       <p id="library-status" class="muted share-status" aria-live="polite"></p>
       <ul id="library" class="library"></ul>
       <p id="library-empty" class="muted">Nothing scanned yet. Photograph each page of a score, then pick the part you want to learn.</p>
-      <p class="report-link"><button class="link report-open">Report a problem</button></p>
+      <p class="report-link"><button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
     </section>
 
     <section id="scan" hidden>
@@ -135,7 +162,7 @@
         </div>
 
         <button id="delete" class="danger">Delete score</button>
-        <p class="report-link"><button class="link report-open">Report a problem</button></p>
+        <p class="report-link"><button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
       </div>
 
       <div id="markup-bar" class="markup-bar" hidden>

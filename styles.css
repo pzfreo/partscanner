@@ -251,6 +251,12 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .report-card textarea { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
 .report-card details { margin: 12px 0; }
 .report-card pre { max-height: 30vh; overflow: auto; padding: 8px; border-radius: 8px; background: var(--surface); font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; }
+.about-card h2 small { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+.about-card h3 { font-size: 1rem; margin: 18px 0 6px; }
+.about-card p, .credits { font-size: 0.92rem; margin: 0 0 8px; }
+.credits { padding-left: 18px; }
+.credits li { margin-bottom: 6px; }
+.about-card a { color: var(--accent); }
 .report-card .muted { font-size: 0.85rem; margin: 10px 0 0; }
 .import-offer { margin: 16px 0; padding: 14px 16px; border: 2px solid var(--accent); border-radius: 12px; background: var(--mine); }
 .import-offer p { margin: 0 0 10px; }

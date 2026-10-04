@@ -130,6 +130,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 te
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-copy.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-delete.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-report.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 40 tests/drive-about.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot
 python3 scripts/flaky-server.py 8768 --flaky &   # breaks every 3rd model response
 node scripts/headless-test.mjs "http://localhost:8768/tests/omr-test.html?page=huron_1.png" out.json 380
@@ -156,4 +157,14 @@ downloads don't allow cross-origin fetches, so they're served with the site).
 
 ## Licence
 
-AGPL-3.0, because the app distributes homr (AGPL-3.0).
+© 2026 Paul Fremantle. Partsong is free software under the GNU Affero General
+Public License v3.0 (see `LICENSE`); it has to be, as it distributes homr. The
+app's About page links here, which is the offer of source to its users.
+
+Third-party components: [homr](https://github.com/liebharc/homr) (AGPL-3.0),
+whose models build on [oemer](https://github.com/BreezeWhite/oemer) (MIT) and
+[Polyphonic-TrOMR](https://github.com/NetEase/Polyphonic-TrOMR) (Apache-2.0);
+[Pyodide](https://pyodide.org) (MPL-2.0) with NumPy (BSD-3-Clause), OpenCV
+(Apache-2.0) and Pillow (MIT-CMU); [ONNX Runtime Web](https://onnxruntime.ai)
+(MIT); [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0);
+[OpenSheetMusicDisplay](https://opensheetmusicdisplay.org) (BSD-3-Clause).
