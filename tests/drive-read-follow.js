@@ -9,7 +9,7 @@ await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onupg
 $("new-scan").click(); history.back(); await sleep(400);
 await waitFor(() => document.querySelector("#library button"), 5000, "library").then((b) => b.click());
 await sleep(500);
-$("view-read").click();
+$("view-toggle").click();
 await waitFor(() => document.querySelectorAll("#osmd svg").length >= 4, 30000, "osmd");
 await sleep(300);
 const marks = (cls) => [...document.querySelectorAll(".read-page")].map((p) => !p.querySelector("." + cls).hidden);

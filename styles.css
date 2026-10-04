@@ -189,18 +189,18 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 0 16px env(safe-area-inset-bottom);
+  gap: 10px;
+  padding: 0 12px env(safe-area-inset-bottom);
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
-.icon-round { width: 52px; height: 52px; min-height: 0; padding: 0; border-radius: 50%; }
+.icon-round { width: 50px; height: 50px; min-height: 0; padding: 0; border-radius: 50%; }
 .icon-round svg { width: 26px; height: 26px; fill: currentColor; }
 #play { width: 60px; height: 60px; }
 #play .i-pause, #play.playing .i-play { display: none; }
 #play.playing .i-pause { display: block; }
 #settings[aria-expanded="true"] { background: var(--mine); border-color: var(--accent); }
-.position { font-variant-numeric: tabular-nums; font-size: 1.05rem; min-width: 96px; text-align: center; }
+.position { font-variant-numeric: tabular-nums; font-size: 1.05rem; min-width: 64px; text-align: center; }
 
 .panel {
   position: fixed;
@@ -223,10 +223,11 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .panel .danger { margin: 24px auto 8px; display: flex; }
 
 details { margin-top: 24px; }
-.view-switch { display: flex; margin: 16px 0 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; }
-.view-switch[hidden] { display: none; }
-.view-switch button { min-height: 40px; border: 0; border-radius: 0; background: var(--surface); font-weight: 500; }
-.view-switch button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+.view-toggle { flex-direction: column; gap: 0; font-size: 0.62rem; font-weight: 600; line-height: 1.1; }
+.view-toggle[hidden] { display: none; }
+.view-toggle svg { width: 20px; height: 20px; }
+.view-toggle .i-pages, .view-toggle.on-read .i-read { display: none; }
+.view-toggle.on-read .i-pages { display: block; }
 .follow { margin-top: 12px; }
 .read-view { margin-top: 12px; }
 .read-view .muted { margin: 0 0 8px; }

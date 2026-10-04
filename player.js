@@ -2,7 +2,11 @@
 // volume (0 = silent) and octave shift when it is scheduled, so your part can
 // change from system to system.
 
-const LOOKAHEAD = 0.25; // seconds scheduled ahead
+// Seconds of notes queued ahead. Generous so a busy main thread (e.g. drawing
+// the score on a phone) doesn't starve the audio; mix changes apply to notes
+// queued after the change.
+const LOOKAHEAD = 1.0;
+const MAX_LATE = 0.03; // after a longer stall, skip overdue notes rather than burst
 const TICK_MS = 50;
 
 const midiToHz = (m) => 440 * 2 ** ((m - 69) / 12);
@@ -81,8 +85,9 @@ export class Player {
           if (n.t >= from && n.t < to) {
             const dur = Math.min(n.dur, this.loopEnd - n.t);
             const { gain, shift = 0 } = this.mix(i, n.t);
-            if (gain > 0) {
-              this.note(n.midi + shift, gain, this.startTime + (n.t - this.startBeat) * secPerBeat, dur * secPerBeat);
+            const when = this.startTime + (n.t - this.startBeat) * secPerBeat;
+            if (gain > 0 && when >= this.ctx.currentTime - MAX_LATE) {
+              this.note(n.midi + shift, gain, when, dur * secPerBeat);
             }
           }
         }

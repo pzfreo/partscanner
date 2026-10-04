@@ -414,7 +414,7 @@ function openScore(entry, nav = "push") {
   setPanel(!partChosen || !entry.images?.length);
   renderFollow();
   // Pages (photos) when there are any to follow along on; otherwise the read score.
-  $("view-switch").hidden = $("follow").hidden;
+  $("view-toggle").hidden = $("follow").hidden;
   setView($("follow").hidden ? "read" : "pages");
 }
 
@@ -605,7 +605,7 @@ $("clear-marks").onclick = () => {
 let marking = false;
 
 function startMarkup() {
-  if ($("view-switch").hidden) return;
+  if ($("view-toggle").hidden) return;
   setView("pages");
   player.stop();
   // Reuse the open panel's history entry (going back then pushing would race).
@@ -949,20 +949,35 @@ function pickReadBar(sheet, e) {
   $("from-bar").onchange();
 }
 
+// Where you are: the playing position, else where you paused, else the start bar.
+const currentBeat = () => (player?.playing ? player.position() : resumeAt ?? barRange()[0]);
+
 function setView(view) {
   const pages = view === "pages";
   $("follow").hidden = !pages;
   $("read-view").hidden = pages;
-  $("view-pages").setAttribute("aria-selected", String(pages));
-  $("view-read").setAttribute("aria-selected", String(!pages));
-  if (!pages) {
+  const t = $("view-toggle");
+  t.classList.toggle("on-read", !pages);
+  $("view-toggle-label").textContent = pages ? "As read" : "Pages";
+  t.setAttribute("aria-label", pages ? "Show the music as read" : "Show your pages");
+  if (pages) {
+    followedBar = null;
+    follow(currentBeat(), !!player?.playing);
+  } else {
     renderRead();
     readBar = null;
-    followRead(player?.playing ? player.position() : barRange()[0], !!player?.playing);
+    followRead(currentBeat(), !!player?.playing);
   }
+  revealCurrentBar();
 }
-$("view-pages").onclick = () => setView("pages");
-$("view-read").onclick = () => setView("read");
+$("view-toggle").onclick = () => setView($("read-view").hidden ? "read" : "pages");
+
+// Scrolls the highlighted bar of the visible view into the middle of the screen.
+function revealCurrentBar() {
+  const bar = barAt(currentBeat());
+  const el = $("read-view").hidden ? pageViews[bar.page]?.bar : readViews[bar.sheet]?.bar;
+  if (el && el.style.display !== "none" && !el.hidden) el.scrollIntoView({ block: "center" });
+}
 
 // Draws the recognised MusicXML with OSMD, loaded on first use.
 let osmdLoaded;
@@ -986,6 +1001,8 @@ async function renderRead() {
   try {
     await osmdLoaded;
     for (const xml of entry.pages) {
+      // Draw a page at a time so playback and scrolling get a turn in between.
+      await new Promise((r) => setTimeout(r, 0));
       if (osmdFor !== entry) return; // another score was opened meanwhile
       const div = document.createElement("div");
       div.className = "read-page";
@@ -1005,7 +1022,8 @@ async function renderRead() {
       div.onclick = (e) => pickReadBar(sheet, e);
       readViews.push(view);
     }
-    showBar(barRange()[0]);
+    showBar(currentBeat());
+    if (!$("read-view").hidden) revealCurrentBar();
   } catch (e) {
     osmdFor = null;
     $("osmd").textContent = e.message;

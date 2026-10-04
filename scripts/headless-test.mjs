@@ -66,6 +66,8 @@ ws.onmessage = ({ data }) => {
 await send("Runtime.enable");
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: 412, height: 915, deviceScaleFactor: 2, mobile: true });
+// CPU_THROTTLE=4 slows the page down to roughly phone speed.
+if (process.env.CPU_THROTTLE) await send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.CPU_THROTTLE) });
 const nav = await send("Page.navigate", { url });
 console.log("navigated", JSON.stringify(nav));
 let shots = 0;

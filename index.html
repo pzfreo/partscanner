@@ -44,11 +44,6 @@
     <section id="practice" hidden>
       <label class="title-wrap"><input id="title" class="title-input" aria-label="Score title (tap to rename)"><span id="title-icon" aria-hidden="true">&#9998;</span></label>
 
-      <div id="view-switch" class="view-switch" role="tablist" aria-label="Show">
-        <button id="view-pages" role="tab" aria-selected="true">Pages</button>
-        <button id="view-read" role="tab" aria-selected="false">As read</button>
-      </div>
-
       <div id="follow" class="follow" hidden>
         <p id="tap-hint" class="muted">Tap a bar to start from there.</p>
         <div id="photo-list" class="photo-list"></div>
@@ -116,6 +111,11 @@
           <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
         </button>
         <div id="position" class="position">Bar 1</div>
+        <button id="view-toggle" class="icon-round view-toggle">
+          <svg class="i-read" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 17.5a2.5 2.5 0 1 1-1.5-2.3V5.5l11-2v11.5a2.5 2.5 0 1 1-1.5-2.3V7.3l-8 1.5z"/></svg>
+          <svg class="i-pages" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h8.5L19 7v14.5H6z M8.5 11h8M8.5 14h8M8.5 17h8" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+          <span id="view-toggle-label">As read</span>
+        </button>
         <button id="settings" class="icon-round" aria-label="Settings" aria-expanded="false" aria-controls="panel">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="16" cy="7" r="2.2" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="10" cy="17" r="2.2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
         </button>
