@@ -325,8 +325,27 @@ function confirmDelete(li, entry) {
 const COPY_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
 
+// Search appears once the library is long enough to need it. Every word typed
+// must appear in the title (ignoring case and accents).
+const SEARCH_FROM = 6;
+const fold = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+function filterLibrary() {
+  const words = fold($("library-search").value).split(/\s+/).filter(Boolean);
+  let shown = 0;
+  for (const li of $("library").children) {
+    const match = words.every((w) => fold(li.dataset.title ?? "").includes(w));
+    li.hidden = !match;
+    shown += match;
+  }
+  $("library-none").hidden = shown > 0 || !$("library").children.length;
+}
+$("library-search").oninput = filterLibrary;
+
 async function renderLibrary() {
   const lib = await db.all().catch(() => []);
+  $("library-search").hidden = lib.length < SEARCH_FROM;
+  if (lib.length < SEARCH_FROM) $("library-search").value = "";
   releasePhotos("library");
   $("library-empty").hidden = lib.length > 0;
   $("intro-more").hidden = lib.length > 0; // the explanation is for newcomers
@@ -338,6 +357,7 @@ async function renderLibrary() {
       .map((entry) => {
         const li = document.createElement("li");
         li.dataset.id = entry.id;
+        li.dataset.title = entry.title;
         const b = document.createElement("button");
         const n = entry.pages.length;
         const done = entry.pages.filter(Boolean).length;
@@ -384,6 +404,7 @@ async function renderLibrary() {
         return li;
       }),
   );
+  filterLibrary();
 }
 
 // ---------- scanning ----------

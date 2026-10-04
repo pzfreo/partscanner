@@ -117,6 +117,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 #intro-more { margin: 10px 0 0; font-size: 0.98rem; }
 
 .library { list-style: none; padding: 0; margin: 0; }
+.library-search { width: 100%; min-height: 44px; margin: 0 0 12px; padding: 0 14px; font: inherit; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); }
 .library li { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
 .library li > button:first-child { border: 0; box-shadow: var(--shadow); min-height: 64px; flex: 1; min-width: 0; gap: 12px; justify-content: flex-start; padding-left: 8px; text-align: left; }
 .library .meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

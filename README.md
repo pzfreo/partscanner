@@ -70,6 +70,8 @@ then *Add to Home screen*.
   now" snoozes it for a month. Installed apps rarely restart, so the app checks
   for a newer deploy (the version stamped into index.html) when it comes back to
   the screen and every 30 minutes, and offers an Update banner.
+- **Library search**: from 6 scores a search box filters the list by title
+  (every word must match; case and accents ignored). `tests/drive-search.js`.
 - **Repeats**: repeat signs and 1st/2nd-time endings from homr's barlines
   (`repeatMarks`, `markRepeats`, `playOrder` in `score.js`); the player plays a
   list of score stretches in order (`player.js`), so a repeat plays twice and
