@@ -38,6 +38,9 @@
 }
 
 * { box-sizing: border-box; }
+/* Component display rules (e.g. button { display: inline-flex }) would
+   otherwise override the hidden attribute. The panel animates its own. */
+[hidden]:not(.panel) { display: none !important; }
 body {
   margin: 0;
   background: var(--bg);

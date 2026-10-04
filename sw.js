@@ -63,7 +63,9 @@ self.addEventListener("fetch", (e) => {
     );
   } else if (url.origin === location.origin && !url.pathname.includes("/models/")) {
     e.respondWith(
-      fetch(e.request)
+      // no-cache: revalidate with the server so app updates show up on the next
+      // load instead of after the HTTP cache (10 min on GitHub Pages) expires.
+      fetch(e.request.url, { cache: "no-cache" })
         .then((res) => {
           if (res.ok) {
             const copy = res.clone();
