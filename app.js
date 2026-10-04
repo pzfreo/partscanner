@@ -3,7 +3,7 @@ import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
-import { parseScoreFile, scoreFile, shareFile } from "./share.js";
+import { entryFromLink, parseScoreFile, scoreFile, shareFile } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -441,6 +441,55 @@ async function shareScore(id, button, status) {
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
 
+
+// A score handed over by a .partsong.html file opened in the browser (from
+// WhatsApp, email…): either posted by the page that opened us (#receive, with
+// photos) or carried in the link itself (#import=…, without photos). Always
+// asks first, since any page could try this.
+async function receiveFromPage() {
+  const hash = location.hash;
+  history.replaceState(null, "", location.pathname);
+  let entry = null;
+  try {
+    if (hash.startsWith("#import=")) entry = await entryFromLink(hash.slice("#import=".length));
+    else if (hash === "#receive" && window.opener) {
+      const json = await new Promise((resolve, reject) => {
+        addEventListener("message", (e) => {
+          if (e.source === window.opener && e.data?.type === "partsong-score") resolve(e.data.json);
+        });
+        const ping = setInterval(() => window.opener?.postMessage("partsong-ready", "*"), 250);
+        setTimeout(() => {
+          clearInterval(ping);
+          reject(new Error("the score didn't arrive"));
+        }, 20000);
+      });
+      entry = parseScoreFile(json);
+    }
+  } catch (e) {
+    showError(`Couldn't open the shared score: ${e.message}`);
+  }
+  if (entry) offerImport(entry);
+}
+
+async function offerImport(entry) {
+  const existing = (await db.all()).find((e) => e.id === entry.id);
+  const exists = !!existing;
+  // A link carries no photos; keep the ones already here for the same pages.
+  if (!entry.images.length && existing?.images?.length && existing.pages.length === entry.pages.length) {
+    entry.images = existing.images;
+  }
+  const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
+  $("import-question").textContent = exists
+    ? `Replace your copy of “${entry.title}” with the one you were sent (${pages})?`
+    : `Add “${entry.title}” (${pages}) to your scores?`;
+  $("import-yes").textContent = exists ? "Replace" : "Add";
+  $("import-offer").hidden = false;
+  $("import-yes").onclick = async () => {
+    $("import-offer").hidden = true;
+    await importScore(entry);
+  };
+  $("import-no").onclick = () => ($("import-offer").hidden = true);
+}
 
 // Files shared to the installed app arrive via the service worker's inbox.
 async function openInbox() {
@@ -1158,7 +1207,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost") {
   navigator.serviceWorker.register("sw.js");
 }
 
-if (new URLSearchParams(location.search).has("inbox")) {
+if (/^#(receive|import=)/.test(location.hash)) {
+  renderLibrary().then(receiveFromPage);
+} else if (new URLSearchParams(location.search).has("inbox")) {
   history.replaceState(null, "", location.pathname);
   renderLibrary().then(openInbox);
 } else {

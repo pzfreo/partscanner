@@ -31,6 +31,20 @@ async function asJpeg(blob) {
   return canvas.convertToBlob({ type: "image/jpeg", quality: PHOTO_QUALITY });
 }
 
+// The score without photos, gzipped into a URL-safe string: small enough for a
+// link (#import=...) that works even where the page's script can't run.
+async function linkPayload(doc) {
+  const json = JSON.stringify({ ...doc, images: [] });
+  const gz = new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("gzip")));
+  return (await toBase64(await gz.blob())).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+export async function entryFromLink(payload) {
+  const gz = fromBase64(payload.replaceAll("-", "+").replaceAll("_", "/"), "application/gzip");
+  const json = await new Response(gz.stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  return parseScoreFile(json);
+}
+
 export async function scoreFile(entry) {
   const images = [];
   for (const blob of entry.images ?? []) images.push(await toBase64(await asJpeg(blob)));
@@ -46,16 +60,40 @@ export async function scoreFile(entry) {
   };
   const title = entry.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Score";
   const app = new URL("./", location.href).href;
+  const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
+  // Opened from WhatsApp/email, the page itself hands the score to the app:
+  // the button opens Partsong and posts the full score (with photos) to it.
+  // Without script, the button is a plain link carrying the score minus photos.
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(entry.title)} – Partsong score</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b}a{color:#1f4e5f}</style>
+<style>
+body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f4ef}
+h1{font-size:1.5rem;margin:0 0 .25em}
+.open{display:block;margin:1.5em 0 .75em;padding:16px;border-radius:12px;background:#1f4e5f;color:#fff;text-align:center;font-weight:600;font-size:1.1rem;text-decoration:none}
+.small{font-size:.9rem;color:#6b6a66}
+a{color:#1f4e5f}
+</style>
 </head><body>
 <h1>${escapeHtml(entry.title)}</h1>
-<p>This is a <strong>Partsong</strong> score (${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}).
-To practise with it, open <a href="${app}">${app.replace(/^https?:\/\//, "")}</a> and use <em>Open file</em>,
-or share this file to the Partsong app.</p>
+<p>A <strong>Partsong</strong> score (${pages}) for learning your part.</p>
+<a id="open" class="open" href="${app}#import=${await linkPayload(doc)}">Open in Partsong</a>
+<p class="small">Partsong opens and asks to add the score to your library. If the photos of the pages don't come across,
+save this file and use <em>Open file</em> in <a href="${app}">${app.replace(/^https?:\/\//, "")}</a>.</p>
 <script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
+<script>
+document.getElementById("open").addEventListener("click", (e) => {
+  const json = document.getElementById("${FORMAT}").textContent;
+  const app = window.open(${JSON.stringify(app + "#receive")}, "_blank");
+  if (!app) return; // popup blocked: follow the link instead
+  e.preventDefault();
+  addEventListener("message", function send(ev) {
+    if (ev.source !== app || ev.data !== "partsong-ready") return;
+    app.postMessage({ type: "partsong-score", json }, "*");
+    removeEventListener("message", send);
+  });
+});
+</script>
 </body></html>
 `;
   return new File([html], `${title}.partsong.html`, { type: "text/html" });

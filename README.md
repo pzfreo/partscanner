@@ -41,7 +41,11 @@ then *Add to Home screen*.
   (recognised MusicXML, photos re-encoded as JPEG, settings and marks) and hands
   it to the share sheet (WhatsApp, Drive, email) or downloads it. Browsers only
   share a few file types, hence HTML; opened elsewhere it's a page linking to the
-  app. *Open file* imports it; a score with the same id is replaced. The installed
+  app. *Open file* imports it; a score with the same id is replaced. Opened in a
+  browser (tapping it in WhatsApp/email), the file shows *Open in Partsong*: it
+  opens the app and posts the full score to it (`#receive`); without script the
+  button is a link carrying the score minus photos (`#import=…`, gzipped). The
+  app always asks before adding. The installed
   app is also a share target (manifest `share_target` → service worker inbox):
   shared score files open, shared PDFs/photos start a new scan.
 - **Lock**: a locked score can't have its part, title or existence changed
@@ -101,6 +105,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-read-follow.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-share.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-library-share.js shot
+CHROME_FLAGS=--disable-popup-blocking node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-receive.js shot
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 180 tests/drive-share-target.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-hidden.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot
