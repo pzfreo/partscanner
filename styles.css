@@ -9,6 +9,7 @@
   --header: #2b2870;
   --gold: #ff6a55;
   --gold-text: #ffffff;
+  --gold-ink: #e2432d; /* coral text on the light background */
   --mine: #ffe5e0;
   --danger: #c0392b;
   --shadow: 0 1px 2px rgb(20 22 30 / 0.05), 0 4px 16px rgb(20 22 30 / 0.07);
@@ -26,6 +27,7 @@
     --header: #24215c;
     --gold: #ff7a66;
     --gold-text: #1a0a07;
+    --gold-ink: #ff7a66;
     --mine: #3d2320;
     --danger: #e8806f;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.25);
@@ -43,6 +45,7 @@
   --header: #24215c;
   --gold: #ff7a66;
   --gold-text: #1a0a07;
+  --gold-ink: #ff7a66;
   --mine: #3d2320;
   --danger: #e8806f;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 14px rgb(0 0 0 / 0.25);
@@ -108,6 +111,10 @@ button:disabled { opacity: 0.45; cursor: default; }
 .wide { width: 100%; margin-top: 16px; }
 .icon-btn { min-height: 36px; padding: 0 10px; background: transparent; border: none; color: inherit; font-size: 1.3rem; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.intro { margin: 8px 0 20px; }
+.tagline { margin: 0; font-size: 1.6rem; line-height: 1.2; font-weight: 750; letter-spacing: -0.02em; }
+.tagline span { color: var(--gold-ink); }
+#intro-more { margin: 10px 0 0; font-size: 0.98rem; }
 
 .library { list-style: none; padding: 0; margin: 0; }
 .library li { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }

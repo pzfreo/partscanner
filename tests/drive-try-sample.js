@@ -20,5 +20,5 @@ r.read = {
   tenor: rows.find((li) => li.querySelector(".pick span").textContent === "Tenor")?.querySelector(".range").textContent,
 };
 history.back(); history.back(); await sleep(600);
-r.footerLinkWhenNotEmpty = !!document.querySelector("#home .report-link .try-sample") && $("library-empty").hidden;
+r.footerLinkWhenNotEmpty = !document.querySelector("#home .footer-sample").hidden && $("library-empty").hidden;
 window.result = r;

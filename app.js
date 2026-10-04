@@ -329,7 +329,8 @@ async function renderLibrary() {
   const lib = await db.all().catch(() => []);
   releasePhotos("library");
   $("library-empty").hidden = lib.length > 0;
-  document.querySelector("#home .report-link .try-sample").hidden = lib.length === 0; // the big button shows instead
+  $("intro-more").hidden = lib.length > 0; // the explanation is for newcomers
+  document.querySelector("#home .footer-sample").hidden = lib.length === 0; // the big button shows instead
   $("library").replaceChildren(
     ...lib
       .slice()

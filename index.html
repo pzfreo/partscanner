@@ -101,6 +101,10 @@
   </div>
   <main>
     <section id="home">
+      <div class="intro">
+        <p class="tagline">Scan your choir music.<br>Hear just <span>your part</span>.</p>
+        <p id="intro-more" class="muted">Photograph your sheet music or open a PDF, choose soprano, alto, tenor or bass, and Partsong plays your line with the others softer while the score follows along. Free, works offline, and your music stays on your phone.</p>
+      </div>
       <div class="actions">
         <button id="new-scan" class="primary">Scan music</button>
         <label class="button">Open file<input id="open-xml" type="file" accept=".html,text/html,.musicxml,.xml,application/vnd.recordare.musicxml+xml" multiple hidden></label>
@@ -124,11 +128,11 @@
       <p id="library-status" class="muted share-status" aria-live="polite"></p>
       <ul id="library" class="library"></ul>
       <div id="library-empty">
-        <p class="muted">Nothing scanned yet. Photograph each page of a score, then pick the part you want to learn.</p>
+        <p class="muted">Nothing scanned yet.</p>
         <p class="muted">Or try it out with a sample: Tallis's <em>If ye love me</em>, three pages for four voices.</p>
         <button class="primary try-sample">Try a sample score</button>
       </div>
-      <p class="report-link"><button class="link try-sample">Try a sample score</button> · <button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
+      <p class="report-link"><span class="footer-sample"><button class="link try-sample">Try a sample score</button> · </span><button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
     </section>
 
     <section id="scan" hidden>
