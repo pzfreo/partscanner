@@ -449,6 +449,29 @@ async function shareScore(id, button, status) {
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
 
+// A copy of the open score (photos, music, marks, settings), unlocked, named
+// "Title (2)" and opened with its title selected for renaming.
+$("copy-score").onclick = async () => {
+  const original = (await db.all()).find((e) => e.id === current.id) ?? current;
+  const copy = await asNewScore({ ...original, id: crypto.randomUUID(), created: Date.now(), locked: false });
+  await db.put(copy);
+  // Close the panel (one step back in history) first, then swap this score's
+  // history entry for the copy, so back still goes to the library.
+  const show = () => {
+    openScore(copy, "replace");
+    $("title").focus();
+    $("title").select();
+    $("share-status").textContent = "Copy made. Give it a new name.";
+  };
+  if (history.state?.panel) {
+    addEventListener("popstate", show, { once: true });
+    setPanel(false);
+  } else {
+    setPanel(false, false);
+    show();
+  }
+};
+
 
 // A score handed over by a .partsong.html file opened in the browser (from
 // WhatsApp, email…): either posted by the page that opened us (#receive, with
