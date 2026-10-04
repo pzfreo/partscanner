@@ -27,7 +27,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site/vendor
-          cp -r index.html *.js styles.css manifest.webmanifest icon.svg icon-192.png icon-512.png favicon.ico \
+          cp -r index.html *.js styles.css manifest.webmanifest icon.svg icon-192.png icon-512.png favicon.ico og-image.png robots.txt sitemap.xml \
             omr models fonts _site/
           cp vendor/homr.zip _site/vendor/
           mkdir -p _site/samples && cp samples/tallis-if-ye-love-me.pdf _site/samples/
