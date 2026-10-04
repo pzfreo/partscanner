@@ -22,12 +22,19 @@ form.method = "POST"; form.enctype = "multipart/form-data"; form.action = "/shar
 const input = d.createElement("input"); input.type = "file"; input.name = "files"; input.multiple = true;
 const dt = new DataTransfer(); dt.items.add(shared); dt.items.add(pdf); input.files = dt.files;
 form.append(input); d.body.append(form); form.submit();
-// 4. The app opens: the score is imported and the PDF becomes a new scan.
+// 4. The app opens: it offers the score, and the PDF becomes a new scan.
 await waitFor(() => b.contentWindow.location.pathname === "/" || b.contentWindow.location.pathname === "/index.html", 20000, "redirect");
 const $ = (id) => b.contentDocument.getElementById(id);
+const r0 = {};
 await waitFor(() => $("scan") && !$("scan").hidden && b.contentDocument.querySelectorAll("#pages img").length === 4, 60000, "pdf pages in scan");
+// The score asks first, as from its page's link, and waits in the inbox till answered.
+r0.offer = await waitFor(() => !$("import-offer").hidden && $("import-question").textContent, 20000, "offer");
+r0.waitingBeforeAnswer = (await (await caches.open("partscanner-inbox")).keys()).length;
+$("import-yes").click();
+await waitFor(async () => (await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onsuccess = () => { const g = q.result.transaction("scores").objectStore("scores").getAll(); g.onsuccess = () => res(g.result); }; })).some((e) => e.id === "sent-1"), 10000, "score added");
 const lib = await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onsuccess = () => { const g = q.result.transaction("scores").objectStore("scores").getAll(); g.onsuccess = () => res(g.result); }; });
 window.result = {
+  ...r0,
   landedOn: b.contentWindow.location.href,
   importedScore: lib.filter((e) => e.id === "sent-1").map((e) => ({ title: e.title, pages: e.pages.length, images: e.images.length, tempo: e.tempo })),
   pdfPagesInScan: b.contentDocument.querySelectorAll("#pages img").length,

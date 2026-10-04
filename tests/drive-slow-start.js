@@ -28,6 +28,15 @@ await (await caches.open("partscanner-inbox")).put("inbox/1-0", new Response(fil
 const g = document.createElement("iframe");
 g.src = "/";
 document.body.append(g);
-await waitFor(async () => (await scores()).some((e) => e.title === "Left in inbox"), 20000, "inbox picked up");
+await waitFor(() => !g.contentDocument.getElementById("import-offer").hidden, 20000, "inbox offer");
+// Android can launch the app twice for one share: a reload before answering
+// must ask again, not lose the score.
+g.contentWindow.location.reload();
+await sleep(500);
+await waitFor(() => !g.contentDocument.getElementById("import-offer").hidden, 20000, "offer after reload");
+r.askedAgainAfterReload = true;
+g.contentDocument.getElementById("import-yes").click();
+await waitFor(async () => (await scores()).some((e) => e.title === "Left in inbox"), 10000, "inbox picked up");
 r.leftoverShareImported = true;
+r.inboxEmptyAfter = (await (await caches.open("partscanner-inbox")).keys()).length === 0;
 window.result = r;

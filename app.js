@@ -853,7 +853,8 @@ function fromOpener() {
   });
 }
 
-async function offerImport(entry) {
+// done() runs once the question is answered either way.
+async function offerImport(entry, done = () => {}) {
   await asNewScore(entry);
   let pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
   if (!entry.images.length) pages += ", without the page photos";
@@ -861,28 +862,34 @@ async function offerImport(entry) {
   $("import-offer").hidden = false;
   $("import-yes").onclick = async () => {
     $("import-offer").hidden = true;
+    await done();
     await importScore(entry);
   };
-  $("import-no").onclick = () => ($("import-offer").hidden = true);
+  $("import-no").onclick = () => {
+    $("import-offer").hidden = true;
+    done();
+  };
 }
 
 // Files shared to the installed app arrive via the service worker's inbox.
+// A score file asks first, as from its page's link, and stays in the inbox
+// until answered: Android can launch the app twice for one share, and the
+// second launch reloads the page.
 async function openInbox() {
   const cache = await caches.open("partscanner-inbox");
-  const files = [];
-  for (const req of await cache.keys()) {
-    const res = await cache.match(req);
-    const name = decodeURIComponent(res.headers.get("x-name") || "shared");
-    files.push(new File([await res.blob()], name, { type: res.headers.get("content-type") || "" }));
-    await cache.delete(req);
-  }
-  if (!files.length) {
-    $("library-status").textContent = "Nothing arrived from the share. Try sharing it again.";
-    return;
-  }
+  const keys = await cache.keys();
   const scans = [];
   const others = [];
-  for (const f of files) {
+  for (const req of keys) {
+    const res = await cache.match(req);
+    const name = decodeURIComponent(res.headers.get("x-name") || "shared");
+    const f = new File([await res.blob()], name, { type: res.headers.get("content-type") || "" });
+    const shared = parseScoreFile(await f.text().catch(() => ""));
+    if (shared) {
+      await offerImport(shared, () => cache.delete(req));
+      continue;
+    }
+    await cache.delete(req);
     if (f.type.startsWith("image/") || (await isPdf(f))) scans.push(f);
     else others.push(f);
   }
