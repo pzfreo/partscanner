@@ -56,10 +56,15 @@ export class Player {
     this.scheduledUntil = fromBeat;
     this.timer = setInterval(() => this.schedule(), TICK_MS);
     this.schedule();
+    // A failing display update must not stop the loop (or the counter freezes).
     const frame = () => {
       if (!this.playing) return;
-      this.onPosition?.(this.position());
       this.raf = requestAnimationFrame(frame);
+      try {
+        this.onPosition?.(this.position());
+      } catch (e) {
+        reportError(e);
+      }
     };
     frame();
   }

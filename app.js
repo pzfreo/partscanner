@@ -6,6 +6,19 @@ import { isPdf, pdfPages } from "./pdf-pages.js";
 import { parseScoreFile, scoreFile, shareFile } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
+
+// Unexpected errors show briefly on screen, so a problem on the phone can be
+// screenshotted rather than just looking like a freeze.
+function showError(message) {
+  const el = $("error-toast");
+  el.textContent = `Something went wrong: ${message}`;
+  el.hidden = false;
+  clearTimeout(showError.timer);
+  showError.timer = setTimeout(() => (el.hidden = true), 8000);
+}
+window.addEventListener("error", (e) => showError(e.message));
+window.addEventListener("unhandledrejection", (e) => showError(e.reason?.message ?? String(e.reason)));
+window.reportError ??= (e) => showError(e?.message ?? String(e));
 const OSMD_URL = "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.0/build/opensheetmusicdisplay.min.js";
 const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const noteName = (m) => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
@@ -457,6 +470,7 @@ function openScore(entry, nav = "push") {
   current.mine = Math.min(entry.mine ?? Math.max(0, soprano), score.lines.length - 1);
   current.excluded = entry.excluded ?? [];
   current.manual = entry.manual ?? {};
+  repairReferences();
   current.octave = entry.octave ?? 0;
   $("octave").value = String(current.octave);
   renderLines();
@@ -564,7 +578,7 @@ function follow(beat, playing = true) {
   showEl(view.playhead, { x1: x, x2: x, y1: r.y, y2: r.y + r.h });
 
   const mine = myLineAt(beat);
-  const note = mine != null && score.lines[mine].notes.find((n) => n.t <= beat + 1e-6 && beat < n.t + n.dur);
+  const note = mine != null && score.lines[mine]?.notes.find((n) => n.t <= beat + 1e-6 && beat < n.t + n.dur);
   if (note?.pos && note.pos.page === bar.page) {
     showEl(view.note, { cx: note.pos.x, cy: note.pos.y, r: view.w * 0.011 });
   } else hide(view.note);
@@ -620,6 +634,24 @@ let othersGain = 0.25;
 // Marks (staff per system, set in mark-up mode) take precedence over the
 // list choice whenever there are any, so nothing is lost by a stray tap.
 const hasMarks = () => Object.keys(current.manual).length > 0;
+
+// Scores saved by an older version can refer to lines or systems that no
+// longer exist once the music is re-analysed; drop those references.
+function repairReferences() {
+  const okLine = (id) => Number.isInteger(Number(id)) && Number(id) >= 0 && Number(id) < score.lines.length;
+  const manual = Object.fromEntries(
+    Object.entries(current.manual).filter(([sys, id]) => okLine(id) && Number(sys) < score.systems.length),
+  );
+  const excluded = current.excluded.filter(okLine);
+  const changed = Object.keys(manual).length !== Object.keys(current.manual).length || excluded.length !== current.excluded.length;
+  if (!okLine(current.mine)) {
+    const soprano = score.lines.findIndex((l) => l.label === "Soprano");
+    current.mine = Math.max(0, soprano);
+  }
+  current.manual = manual;
+  current.excluded = excluded;
+  if (changed) updateEntry(current.id, { manual, excluded, mine: current.mine });
+}
 
 function myLineAt(beat) {
   if (!hasMarks()) return current.mine;

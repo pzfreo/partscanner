@@ -223,6 +223,7 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 }
 .panel[hidden] { display: block; visibility: hidden; transform: translateY(110%); }
 .panel > * { max-width: 608px; margin-left: auto; margin-right: auto; }
+.error-toast { position: fixed; top: 64px; left: 12px; right: 12px; z-index: 10; padding: 10px 14px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 0.9rem; box-shadow: 0 6px 18px rgb(0 0 0 / 0.25); }
 .share-row { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
 .panel .danger { margin: 24px auto 8px; display: flex; }
 
