@@ -23,6 +23,7 @@ const SHELL_FILES = [
   "icon.svg",
   "icon-192.png",
   "fonts/plus-jakarta-sans-latin-wght.woff2",
+  "samples/tallis-if-ye-love-me.pdf",
 ];
 
 self.addEventListener("install", (e) => {
