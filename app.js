@@ -978,7 +978,9 @@ function follow(beat, playing = true) {
   const mine = myLineAt(beat);
   const note = mine != null && score.lines[mine]?.notes.find((n) => n.t <= beat + 1e-6 && beat < n.t + n.dur);
   if (note?.pos && note.pos.page === bar.page) {
-    showEl(view.note, { cx: note.pos.x, cy: note.pos.y, r: view.w * 0.011 });
+    // Across the bar, the onset's average position is steadier than one note's.
+    const cx = onsets.find((o) => Math.abs(o.t - note.t) < 1e-6)?.x ?? note.pos.x;
+    showEl(view.note, { cx, cy: note.pos.y, r: view.w * 0.011 });
   } else hide(view.note);
 }
 

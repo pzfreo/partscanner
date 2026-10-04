@@ -68,6 +68,7 @@ export function parsePage(xmlText) {
             midi: pitch
               ? 12 * (num(pitch, "octave") + 1) + STEPS[pitch.querySelector("step").textContent] + num(pitch, "alter")
               : null,
+            step: pitch ? 7 * num(pitch, "octave") + "CDEFGAB".indexOf(pitch.querySelector("step").textContent) : null,
             tieStart: !!el.querySelector('tie[type="start"]'),
             tieStop: !!el.querySelector('tie[type="stop"]'),
             pos: imagePosition(el),
@@ -78,9 +79,57 @@ export function parsePage(xmlText) {
       }
       return { notes, length: maxPos || timeLength };
     });
+    for (let staff = 1; staff <= staves; staff++) placeNoteheads(measures, staff);
     return { staves, measures };
   });
   return { title, parts };
+}
+
+// homr's note positions come from where its model was looking, so they wander
+// up or down the stem. Within one staff of one system, a notehead's height is a
+// straight-line function of its pitch, so fit that line (allowing for a fixed
+// lean per voice, as first-voice stems point up and second-voice ones down)
+// and move each position onto its notehead. Photos are often tilted, so the
+// staff may also slope across the page.
+function placeNoteheads(measures, staff) {
+  const groups = [];
+  let lastX = -Infinity;
+  for (const m of measures) {
+    const notes = m.notes.filter((n) => n.staff === staff && n.pos && n.step != null);
+    if (!notes.length) continue;
+    const x0 = Math.min(...notes.map((n) => n.pos.x));
+    if (x0 < lastX || !groups.length) groups.push([]); // back to the left: a new system
+    groups.at(-1).push(...notes);
+    lastX = Math.max(...notes.map((n) => n.pos.x));
+  }
+  for (const notes of groups) {
+    const lean = (n) => (n.tag ? (n.tag.endsWith("2") ? 1 : -1) : 0);
+    const steps = new Set(notes.map((n) => n.step));
+    if (notes.length < 6 || steps.size < 3) continue;
+    const both = new Set(notes.map(lean)).size > 1;
+    const fit = leastSquares(notes.map((n) => [1, n.step, n.pos.x / 1000, ...(both ? [lean(n)] : [])]), notes.map((n) => n.pos.y));
+    if (!fit || fit[1] >= 0) continue; // higher notes must sit higher up the page
+    for (const n of notes) n.pos.y = Math.round(fit[0] + fit[1] * n.step + (fit[2] * n.pos.x) / 1000);
+  }
+}
+
+function leastSquares(rows, ys) {
+  const k = rows[0].length;
+  const a = Array.from({ length: k }, (_, i) => [
+    ...Array.from({ length: k }, (_, j) => rows.reduce((s, r) => s + r[i] * r[j], 0)),
+    rows.reduce((s, r, n) => s + r[i] * ys[n], 0),
+  ]);
+  for (let i = 0; i < k; i++) {
+    const p = a.reduce((best, row, r) => (r >= i && Math.abs(row[i]) > Math.abs(a[best][i]) ? r : best), i);
+    [a[i], a[p]] = [a[p], a[i]];
+    if (Math.abs(a[i][i]) < 1e-9) return null;
+    for (let r = 0; r < k; r++) {
+      if (r === i) continue;
+      const f = a[r][i] / a[i][i];
+      for (let c = i; c <= k; c++) a[r][c] -= f * a[i][c];
+    }
+  }
+  return a.map((row, i) => row[k] / row[i]);
 }
 
 // Splits one staff's notes in one bar into an upper and a lower line, by
