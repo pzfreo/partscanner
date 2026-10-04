@@ -86,6 +86,7 @@ a{color:#2b2870}
 <div class="buttons">
 <div id="send-box" hidden>
 <button id="send" class="btn primary">Open in the Partsong app</button>
+<button id="send-test" class="btn">Test: send a picture to the app</button>
 <p class="small">If you've installed Partsong on this phone: choose <em>Partsong</em> from the list that appears. Otherwise:</p>
 </div>
 <a id="open" class="btn primary" href="${app}#import=${await linkPayload(doc)}">Open in Partsong on the web</a>
@@ -115,6 +116,15 @@ if (/Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] 
   document.getElementById("send-box").hidden = false;
   document.getElementById("open").classList.remove("primary");
   send.onclick = () => navigator.share({ files: [file] }).catch(() => {});
+  // TEMPORARY: does a picture shared from this page reach the app's share target?
+  document.getElementById("send-test").onclick = () => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 200;
+    const g = c.getContext("2d");
+    g.fillStyle = "#2b2870";
+    g.fillRect(0, 0, 200, 200);
+    c.toBlob((b) => navigator.share({ files: [new File([b], "partsong-test.png", { type: "image/png" })] }).catch(() => {}), "image/png");
+  };
 }
 </script>
 </body></html>
