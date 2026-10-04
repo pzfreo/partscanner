@@ -47,20 +47,19 @@
   </div>
   <div id="report" class="report-overlay" role="dialog" aria-labelledby="report-heading" hidden>
     <div class="report-card">
-      <h2 id="report-heading">Report a problem</h2>
+      <div class="card-head">
+        <h2 id="report-heading">Report a problem</h2>
+        <button id="report-close" class="card-close" aria-label="Close">&times;</button>
+      </div>
       <label for="report-text">What happened? What did you expect?</label>
-      <textarea id="report-text" rows="5" placeholder="e.g. On page 2 the altos play the sopranos' notes in bar 20"></textarea>
+      <textarea id="report-text" rows="4" placeholder="e.g. On page 2 the altos play the sopranos' notes in bar 20"></textarea>
+      <ol id="report-steps" class="steps"></ol>
+      <button id="report-share" class="primary wide">Share report with score</button>
+      <p id="report-status" class="report-status" aria-live="polite"></p>
       <details>
         <summary>Technical details included</summary>
         <pre id="report-diag"></pre>
       </details>
-      <div class="actions">
-        <button id="report-share" class="primary">Share report with score</button>
-        <button id="report-send">Email report</button>
-        <button id="report-copy">Copy report</button>
-        <button id="report-close">Cancel</button>
-      </div>
-      <p id="report-status" class="muted" aria-live="polite">Opens your email app, addressed to bugs@partsong.app.</p>
     </div>
   </div>
   <main>

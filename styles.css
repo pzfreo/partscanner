@@ -257,6 +257,13 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .credits { padding-left: 18px; }
 .credits li { margin-bottom: 6px; }
 .about-card a { color: var(--accent); }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.card-head h2 { margin: 0; }
+.card-close { min-height: 0; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; font-size: 1.6rem; color: var(--muted); }
+.steps { margin: 14px 0 12px; padding-left: 22px; font-size: 0.95rem; }
+.steps li { margin-bottom: 4px; }
+.report-status { margin: 10px 0 0; font-weight: 600; color: var(--accent); }
+.report-status:empty { display: none; }
 .report-card .muted { font-size: 0.85rem; margin: 10px 0 0; }
 .import-offer { margin: 16px 0; padding: 14px 16px; border: 2px solid var(--accent); border-radius: 12px; background: var(--mine); }
 .import-offer p { margin: 0 0 10px; }

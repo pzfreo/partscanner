@@ -77,12 +77,18 @@ function goHome() {
 }
 $("back").onclick = goHome;
 
+// Back/forward: make the screen match the history entry landed on (overlays,
+// settings panel and mark-up mode are part of the entry), rather than closing
+// things blindly, so they never get out of step with the history.
 window.addEventListener("popstate", (e) => {
-  if (!$("report").hidden && !e.state?.report) return closeReport(false);
-  if (!$("about").hidden && !e.state?.about) return closeAbout(false);
-  if (e.state?.screen === "practice" && !$("practice").hidden) {
-    setPanel(false, false);
-    endMarkup(false);
+  const st = e.state ?? {};
+  if (!st.report) closeReport(false);
+  if (!st.about) closeAbout(false);
+  if (st.screen && !$(st.screen).hidden) {
+    if (st.screen === "practice") {
+      setPanel(!!st.panel, false);
+      if (!st.markup) endMarkup(false);
+    }
   } else show("home", "none");
 });
 
@@ -123,11 +129,25 @@ function diagnostics() {
 function openReport() {
   $("report-diag").textContent = diagnostics();
   const withScore = !$("practice").hidden && !!current;
-  $("report-share").hidden = !withScore;
-  $("report-send").classList.toggle("primary", !withScore);
-  $("report-status").textContent = withScore
-    ? `Share report with score attaches the score (photos and music) so the problem can be reproduced.`
-    : `Opens your email app, addressed to ${REPORT_TO}.`;
+  const phone = isMobile() && !!navigator.canShare;
+  const button = withScore ? "Share report with score" : "Share report";
+  $("report-share").textContent = button;
+  $("report-status").textContent = "";
+  const steps = phone
+    ? [
+        "Describe what happened above.",
+        `Tap <b>${button}</b>.`,
+        "Choose Gmail or your email app.",
+        `In <b>To</b>, paste <b>${REPORT_TO}</b> (it's copied for you).`,
+        "Send.",
+      ]
+    : [
+        "Describe what happened above.",
+        `Click <b>${button}</b>: an email to <b>${REPORT_TO}</b> opens${withScore ? " and the score file downloads" : ""}.`,
+        ...(withScore ? ["Attach the downloaded file to the email."] : []),
+        "Send.",
+      ];
+  $("report-steps").innerHTML = steps.map((s) => `<li>${s}</li>`).join("");
   $("report").hidden = false;
   history.pushState({ ...history.state, report: true }, "");
   $("report-text").focus();
@@ -139,6 +159,7 @@ function closeReport(nav = true) {
   if (nav && history.state?.report) history.back();
 }
 $("report-close").onclick = () => closeReport();
+$("report").onclick = (e) => e.target === $("report") && closeReport();
 
 // About: version, privacy, licence (AGPL: the source link is the offer of
 // source to network users) and third-party credits.
@@ -158,66 +179,57 @@ function reportText() {
   return `${$("report-text").value.trim() || "(no description)"}\n\n---\n${$("report-diag").textContent}`;
 }
 
-$("report-send").onclick = () => {
-  const what = $("report-text").value.trim().split("\n")[0].slice(0, 60);
-  const subject = `Partsong problem${what ? `: ${what}` : ""}`;
-  // Long bodies can break the hand-off to the mail app; trim if needed.
-  let body = reportText();
-  if (body.length > 6000) body = body.slice(0, 6000) + "\n…(trimmed)";
-  const url = `mailto:${REPORT_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  $("report-send").dataset.href = url; // what was handed to the mail app (also used by tests)
-  location.href = url;
-  $("report-status").textContent = `If no email app opened, use Copy report and send it to ${REPORT_TO}.`;
-};
-
-// The report plus the open score as a file. Phones: the share sheet (pick
-// email; the address is copied to paste in, since a web app can't fill in the
-// recipient). Desktop: download the file and open the report email.
+// One button: the report (plus the open score as a file, when there is one).
+// Phones: the share sheet; the address is copied to paste in, since a web app
+// can't fill in the recipient. Desktop: an email opens (and the score file
+// downloads, to attach).
 let reportPrepared = null; // { id, file }
 $("report-share").onclick = async () => {
   const button = $("report-share");
   const status = $("report-status");
   navigator.clipboard?.writeText(REPORT_TO).catch(() => {});
+  const what = $("report-text").value.trim().split("\n")[0].slice(0, 60);
+  const title = `Partsong problem${what ? `: ${what}` : ""}`;
+  const withScore = !$("practice").hidden && !!current;
   button.disabled = true;
   try {
-    if (reportPrepared?.id !== current.id) {
-      status.textContent = "Preparing the score…";
-      const entry = (await db.all()).find((e) => e.id === current.id) ?? current;
-      reportPrepared = { id: current.id, file: await scoreFile(entry) };
+    let file = null;
+    if (withScore) {
+      if (reportPrepared?.id !== current.id) {
+        status.textContent = "Preparing the score…";
+        const entry = (await db.all()).find((e) => e.id === current.id) ?? current;
+        reportPrepared = { id: current.id, file: await scoreFile(entry) };
+      }
+      file = reportPrepared.file;
     }
-    const file = reportPrepared.file;
-    const what = $("report-text").value.trim().split("\n")[0].slice(0, 60);
-    const title = `Partsong problem${what ? `: ${what}` : ""}`;
     const text = `To: ${REPORT_TO}\n\n${reportText()}`;
-    if (isMobile() && navigator.canShare?.({ files: [file], text })) {
+    const share = file ? { files: [file], title, text } : { title, text };
+    if (isMobile() && navigator.canShare?.(share)) {
       try {
-        await navigator.share({ files: [file], title, text });
+        await navigator.share(share);
         reportPrepared = null;
-        status.textContent = `Shared. If you chose email, paste ${REPORT_TO} (copied) as the recipient.`;
+        status.textContent = `Thanks! Remember to paste ${REPORT_TO} into To.`;
       } catch (e) {
         status.textContent =
-          e.name === "NotAllowedError" ? "Ready. Tap Share report with score again." : e.name === "AbortError" ? "" : `Couldn't share: ${e.message}`;
+          e.name === "NotAllowedError" ? `Ready. Tap ${button.textContent} again.` : e.name === "AbortError" ? "" : `Couldn't share: ${e.message}`;
       }
     } else {
-      await shareFile(file, title); // downloads on desktop
+      if (file) await shareFile(file, title); // downloads on desktop
       reportPrepared = null;
-      $("report-send").click();
-      status.textContent = `Attach the downloaded file (${file.name}) to the email that opened.`;
+      let body = reportText();
+      if (body.length > 6000) body = body.slice(0, 6000) + "\n…(trimmed)";
+      const url = `mailto:${REPORT_TO}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+      button.dataset.href = url; // what was handed to the mail app (also used by tests)
+      location.href = url;
+      status.textContent = file
+        ? `Attach ${file.name} (in your Downloads) to the email, then send.`
+        : `If no email opened, write to ${REPORT_TO} and paste the details below.`;
     }
   } catch (e) {
     reportPrepared = null;
-    status.textContent = `Couldn't prepare the score: ${e.message}`;
+    status.textContent = `Couldn't prepare the report: ${e.message}`;
   } finally {
     button.disabled = false;
-  }
-};
-
-$("report-copy").onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(`To: ${REPORT_TO}\n\n${reportText()}`);
-    $("report-status").textContent = `Copied. Paste it into an email to ${REPORT_TO}.`;
-  } catch {
-    $("report-status").textContent = "Couldn't copy here. Long-press the technical details to copy them.";
   }
 };
 
