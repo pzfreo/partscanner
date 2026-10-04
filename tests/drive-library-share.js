@@ -21,6 +21,7 @@ await shot(false);
 // First attempt: the browser refuses (tap too long ago); second tap shares.
 const shared = [];
 let calls = 0;
+Object.defineProperty(navigator, "userAgentData", { value: { mobile: true }, configurable: true });
 navigator.canShare = () => true;
 navigator.share = async ({ files }) => { calls++; if (calls === 1) throw new DOMException("no activation", "NotAllowedError"); shared.push(files[0]); };
 const statuses = [];

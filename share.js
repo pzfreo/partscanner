@@ -87,10 +87,14 @@ export function parseScoreFile(text) {
   };
 }
 
-// Android share sheet where available; otherwise a download. "retry" means
-// the share sheet needs a fresh tap (browsers only allow it shortly after one).
+const isMobile = () => navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Phones: the share sheet (WhatsApp, Drive, email). Desktop: a plain download,
+// even where the browser offers a share menu (e.g. Chrome on macOS).
+// "retry" means the share sheet needs a fresh tap (browsers only allow it
+// shortly after one).
 export async function shareFile(file, title) {
-  if (navigator.canShare?.({ files: [file] })) {
+  if (isMobile() && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title });
       return "shared";

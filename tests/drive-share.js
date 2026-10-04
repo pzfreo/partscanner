@@ -12,8 +12,10 @@ await waitFor(() => document.querySelector("#library button"), 5000, "library").
 await sleep(500);
 const r = {};
 
-// Share sheet available: capture what would be handed to WhatsApp/Drive.
+// On a phone with a share sheet: capture what would be handed to WhatsApp/Drive.
 let shared;
+const setPhone = (on) => Object.defineProperty(navigator, "userAgentData", { value: { mobile: on }, configurable: true });
+setPhone(true);
 navigator.canShare = () => true;
 navigator.share = async ({ files }) => { shared = files[0]; };
 $("settings").click(); await sleep(300);
@@ -29,9 +31,10 @@ await waitFor(() => f.contentDocument?.body?.textContent.includes("Partsong"), 1
 r.asPage = { heading: f.contentDocument.querySelector("h1").textContent, link: f.contentDocument.querySelector("a").href, text: f.contentDocument.querySelector("p").textContent.replace(/\s+/g, " ").slice(0, 60) };
 f.remove();
 
-// No share sheet (desktop): falls back to a download.
+// Desktop: a plain download even though a share menu is available.
 let downloaded;
-navigator.canShare = () => false;
+setPhone(false);
+navigator.canShare = () => true;
 const origClick = HTMLAnchorElement.prototype.click;
 HTMLAnchorElement.prototype.click = function () { if (this.download) downloaded = this.download; else origClick.call(this); };
 $("share").click();
