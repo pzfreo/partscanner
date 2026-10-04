@@ -49,6 +49,9 @@ self.addEventListener("fetch", (e) => {
           const headers = { "content-type": f.type, "x-name": encodeURIComponent(f.name) };
           await cache.put(`inbox/${Date.now()}-${i++}`, new Response(f, { headers }));
         }
+        // Android can launch the app twice for one share, and the page may
+        // already have looked in the inbox: tell open pages it has changed.
+        for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "inbox" });
         return Response.redirect(new URL("./?inbox", self.registration.scope).href, 303);
       })(),
     );

@@ -1,11 +1,13 @@
 // Android share sheet -> installed app: posts a score file and a PDF to
 // ./share-target (as the OS does) and checks the service worker hands them to
-// the app. Run against http://127.0.0.1:8765/index.html (the app skips its
+// the app. Run against http://127.0.0.1:8765/testdata/ (the app skips its
 // service worker on "localhost").
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const waitFor = async (fn, ms, label) => { const end = Date.now() + ms; while (Date.now() < end) { try { const v = await fn(); if (v) return v; } catch {} await sleep(200); } throw new Error("timeout waiting for " + label); };
 const frame = (src) => { const f = document.createElement("iframe"); f.style.cssText = "width:412px;height:900px;border:0"; f.src = src; document.body.prepend(f); return f; };
-// 1. Install: this page is the app; wait for its service worker.
+// 1. Install the service worker from this page, which isn't the app itself (an
+// app page here would also hear "a share landed" and take the files).
+await navigator.serviceWorker.register("/sw.js");
 await waitFor(() => navigator.serviceWorker.controller, 20000, "service worker");
 // 2. Make a score file to share, with the app's own exporter.
 const { scoreFile } = await import("/share.js");
@@ -33,6 +35,14 @@ r0.waitingBeforeAnswer = (await (await caches.open("partscanner-inbox")).keys())
 $("import-yes").click();
 await waitFor(async () => (await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onsuccess = () => { const g = q.result.transaction("scores").objectStore("scores").getAll(); g.onsuccess = () => res(g.result); }; })).some((e) => e.id === "sent-1"), 10000, "score added");
 const lib = await new Promise((res) => { const q = indexedDB.open("partscanner", 1); q.onsuccess = () => { const g = q.result.transaction("scores").objectStore("scores").getAll(); g.onsuccess = () => res(g.result); }; });
+// 5. The race Android causes: the page has already looked in an empty inbox
+// when the share lands. The service worker tells it, and it offers the score.
+$("import-offer").hidden = true;
+const late = await scoreFile({ id: "late-1", title: "Arrived late", created: 2, pages, images, tempo: 60 });
+const fd = new FormData();
+fd.append("files", late);
+await b.contentWindow.fetch("/share-target", { method: "POST", body: fd });
+r0.lateOffer = await waitFor(() => !$("import-offer").hidden && $("import-question").textContent.includes("Arrived late") && $("import-question").textContent, 10000, "late offer");
 window.result = {
   ...r0,
   landedOn: b.contentWindow.location.href,

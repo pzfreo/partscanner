@@ -867,7 +867,8 @@ function fromOpener() {
   });
 }
 
-// done() runs once the question is answered either way.
+// done() runs once the question is answered either way; if it returns false
+// the score is no longer on offer (another window took it).
 async function offerImport(entry, done = () => {}) {
   await asNewScore(entry);
   const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
@@ -877,7 +878,7 @@ async function offerImport(entry, done = () => {}) {
   $("import-offer").hidden = false;
   $("import-yes").onclick = async () => {
     $("import-offer").hidden = true;
-    await done();
+    if ((await done()) === false) return;
     await importScore(entry);
   };
   $("import-no").onclick = () => {
@@ -893,6 +894,7 @@ async function offerImport(entry, done = () => {}) {
 async function openInbox() {
   const cache = await caches.open("partscanner-inbox");
   const keys = await cache.keys();
+  if (!keys.length) return;
   const scans = [];
   const others = [];
   for (const req of keys) {
@@ -904,7 +906,7 @@ async function openInbox() {
       await offerImport(shared, () => cache.delete(req));
       continue;
     }
-    await cache.delete(req);
+    if (!(await cache.delete(req))) continue; // another window took it
     if (f.type.startsWith("image/") || (await isPdf(f))) scans.push(f);
     else others.push(f);
   }
@@ -914,6 +916,11 @@ async function openInbox() {
     await addFiles(scans);
   }
 }
+
+// A share can land after the page has looked (see above), or while it's in
+// the background: look again when told, and when it comes back to the screen.
+navigator.serviceWorker?.addEventListener("message", (e) => e.data?.type === "inbox" && openInbox());
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && "caches" in window && openInbox());
 
 // ---------- practice ----------
 

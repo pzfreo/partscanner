@@ -157,7 +157,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-share.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-library-share.js shot
 CHROME_FLAGS=--disable-popup-blocking node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-receive.js shot
-node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 180 tests/drive-share-target.js shot
+node scripts/headless-test.mjs "http://127.0.0.1:8765/testdata/" out.json 180 tests/drive-share-target.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-hidden.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-panel.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-copy.js shot
