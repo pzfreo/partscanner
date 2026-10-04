@@ -24,7 +24,7 @@ await fetch("/__hang?off");
 
 // 2. A share left in the inbox by a launch that never finished.
 const file = await scoreFile({ id: "left", title: "Left in inbox", created: 1, pages: [xml], images: [] });
-await (await caches.open("partscanner-inbox")).put("inbox/1-0", new Response(file, { headers: { "content-type": "text/html", "x-name": "x.partsong.html" } }));
+await (await caches.open("partscanner-inbox")).put("inbox/1-0", new Response(file, { headers: { "content-type": "application/pdf", "x-name": "x.partsong.pdf" } }));
 const g = document.createElement("iframe");
 g.src = "/";
 document.body.append(g);

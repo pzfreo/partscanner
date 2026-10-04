@@ -23,13 +23,12 @@ $("share").click();
 await waitFor(() => shared, 60000, "share");
 r.file = { name: shared.name, type: shared.type, mb: +(shared.size / 1e6).toFixed(1) };
 r.status = await waitFor(() => $("share-status").textContent, 5000, "status");
-// Opened outside the app it's a readable page pointing to Partsong.
-const f = document.createElement("iframe");
-f.src = URL.createObjectURL(shared);
-document.body.append(f);
-await waitFor(() => f.contentDocument?.body?.textContent.includes("Partsong"), 10000, "html page");
-r.asPage = { heading: f.contentDocument.querySelector("h1").textContent, link: f.contentDocument.querySelector("a").href, text: f.contentDocument.querySelector("p").textContent.replace(/\s+/g, " ").slice(0, 60) };
-f.remove();
+// Opened outside the app it's a PDF of the page photos plus a page saying how
+// to open it in Partsong.
+const { pdfPages } = await import("/pdf-pages.js");
+let pdfPageCount = 0;
+await pdfPages(shared, async (blob, n, count) => { pdfPageCount = count; });
+r.asPdf = { pages: pdfPageCount, head: await shared.slice(0, 5).text() };
 
 // Desktop: a plain download even though a share menu is available.
 let downloaded;
@@ -74,4 +73,8 @@ $("back").click(); await sleep(500);
 open(new File(["hello"], "notes.txt", { type: "text/plain" }));
 await sleep(500);
 r.badFile = $("library-status").textContent;
+// An ordinary PDF (not a Partsong score) starts a new scan.
+open(new File([await (await fetch("/testdata/huron.pdf")).blob()], "huron.pdf", { type: "application/pdf" }));
+await waitFor(() => !$("scan").hidden && document.querySelectorAll("#pages img").length === 4, 60000, "pdf scan");
+r.plainPdfScanPages = document.querySelectorAll("#pages img").length;
 window.result = r;

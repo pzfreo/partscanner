@@ -3,7 +3,7 @@ import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
-import { entryFromLink, isMobile, parseScoreFile, scoreFile, shareFile } from "./share.js";
+import { entryFromLink, isMobile, parseScoreFile, readScoreFile, scoreFile, shareFile } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -724,21 +724,30 @@ $("open-xml").onchange = async (e) => {
 };
 
 // Score files (shared from Partsong) and MusicXML, from the picker or the
-// share sheet.
+// share sheet; an ordinary PDF starts a new scan.
 async function openFiles(files) {
   try {
     const xmls = [];
+    const pdfs = [];
     let name = "";
     for (const f of files) {
-      const text = await f.text();
-      const shared = parseScoreFile(text);
+      const shared = await readScoreFile(f);
       if (shared) {
         await importScore(shared);
         continue;
       }
+      if (await isPdf(f)) {
+        pdfs.push(f);
+        continue;
+      }
+      const text = await f.text();
       parsePage(text); // throws if it isn't MusicXML
       xmls.push(text);
       name ||= f.name.replace(/\.(musicxml|xml)$/i, "");
+    }
+    if (pdfs.length) {
+      loadScan();
+      await addFiles(pdfs);
     }
     if (!xmls.length) return;
     const title = parsePage(xmls[0]).title || name || "Imported score";
@@ -811,7 +820,7 @@ async function copyScore(id) {
   shareScore.timer = setTimeout(() => ($("library-status").textContent = ""), 5000);
 }
 
-// A score handed over by a .partsong.html file opened in the browser (from
+// A score handed over by an older .partsong.html file opened in the browser (from
 // WhatsApp, email…): carried in the link itself (#import=…, without photos)
 // and, with &receive, posted in full by the page that opened us when it can
 // (an installed app opened from the link has no way back to that page). Older
@@ -887,32 +896,13 @@ async function offerImport(entry, done = () => {}) {
   };
 }
 
-// TEMPORARY share check: a visible trail of what each share launch received,
-// to find where sharing from the file page fails on a phone. Remove once found.
-const shareTrail = (() => {
-  try {
-    return JSON.parse(localStorage.getItem("partsong.sharetrail") || "[]");
-  } catch {
-    return [];
-  }
-})();
-function shareCheck(msg) {
-  shareTrail.push(`${new Date().toLocaleTimeString()} ${msg}`);
-  shareTrail.splice(0, shareTrail.length - 6);
-  try {
-    localStorage.setItem("partsong.sharetrail", JSON.stringify(shareTrail));
-  } catch {}
-  $("library-status").textContent = "Share check: " + shareTrail.join(" · ");
-}
-
 // Files shared to the installed app arrive via the service worker's inbox.
 // A score file asks first, as from its page's link, and stays in the inbox
 // until answered: Android can launch the app twice for one share, and the
 // second launch reloads the page.
-async function openInbox(why = "") {
+async function openInbox() {
   const cache = await caches.open("partscanner-inbox");
   const keys = await cache.keys();
-  if (why || keys.length) shareCheck(`${why || "looked"}: ${keys.length} waiting`);
   if (!keys.length) return;
   const scans = [];
   const others = [];
@@ -920,10 +910,8 @@ async function openInbox(why = "") {
     const res = await cache.match(req);
     const name = decodeURIComponent(res.headers.get("x-name") || "shared");
     const f = new File([await res.blob()], name, { type: res.headers.get("content-type") || "" });
-    const shared = parseScoreFile(await f.text().catch(() => ""));
-    if (!shared) shareCheck(`not a score: ${name} (${f.size} bytes)`);
+    const shared = await readScoreFile(f).catch(() => null);
     if (shared) {
-      shareCheck(`offered ${shared.title}`);
       await offerImport(shared, () => cache.delete(req));
       continue;
     }
@@ -940,7 +928,7 @@ async function openInbox(why = "") {
 
 // A share can land after the page has looked (see above), or while it's in
 // the background: look again when told, and when it comes back to the screen.
-navigator.serviceWorker?.addEventListener("message", (e) => e.data?.type === "inbox" && openInbox("landed while open"));
+navigator.serviceWorker?.addEventListener("message", (e) => e.data?.type === "inbox" && openInbox());
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && "caches" in window && openInbox());
 
 // ---------- practice ----------
@@ -1762,11 +1750,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost") {
 if (/^#(receive|import=)/.test(location.hash)) {
   renderLibrary().then(receiveFromPage);
 } else if (new URLSearchParams(location.search).has("inbox")) {
-  const stored = new URLSearchParams(location.search).get("inbox");
-  const fields = new URLSearchParams(location.search).get("fields");
   history.replaceState(null, "", location.pathname);
   renderLibrary()
-    .then(() => openInbox(`launched by share [${fields || "?"}], ${stored || "?"} stored`))
+    .then(openInbox)
     .catch((e) => showError(`Couldn't open the shared file: ${e.message}`));
 } else {
   // A share whose launch never finished (e.g. stuck offline) is still waiting.

@@ -1,19 +1,15 @@
 // Score files for sharing between devices or people (WhatsApp, Drive, email):
-// an .html file (one of the few types browsers will hand to the share sheet)
-// carrying the recognised MusicXML, page photos and practice settings as JSON.
-// Opened anywhere else, it shows a note pointing to Partsong. (Internal ids
-// keep the app's original name, Part Scanner, so older files still open.)
+// a .partsong.pdf, a real PDF of the page photos that anyone can read, with the
+// recognised MusicXML and practice settings attached inside it (PDF is one of
+// the few types browsers hand to the share sheet, and phones open it anywhere).
+// A last page says how to open it in Partsong. Older .partsong.html files (the
+// same JSON in a page, photos as base64) still open. (Internal ids keep the
+// app's original name, Part Scanner, so older files still open.)
 
 const FORMAT = "partscanner-score";
 const SETTINGS = ["mine", "excluded", "manual", "octave", "tempo", "others", "locked", "repeats", "playRepeats"];
 const PHOTO_QUALITY = 0.85;
-
-async function toBase64(blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(s);
-}
+const PAGE_WIDTH = 595.28; // A4 width in PDF points; photo pages keep their shape
 
 function fromBase64(data, type) {
   const s = atob(data);
@@ -28,18 +24,10 @@ async function asJpeg(blob) {
   const canvas = new OffscreenCanvas(bmp.width, bmp.height);
   canvas.getContext("2d").drawImage(bmp, 0, 0);
   bmp.close();
-  return canvas.convertToBlob({ type: "image/jpeg", quality: PHOTO_QUALITY });
+  return { jpeg: await canvas.convertToBlob({ type: "image/jpeg", quality: PHOTO_QUALITY }), width: canvas.width, height: canvas.height };
 }
 
-// The score without photos, gzipped into a URL-safe string: small enough for a
-// link (#import=...) that works even where the page's script can't run. It
-// says how many photos were left out, so the app can refuse a partial copy.
-async function linkPayload(doc) {
-  const json = JSON.stringify({ ...doc, images: [], photos: doc.images.length });
-  const gz = new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("gzip")));
-  return (await toBase64(await gz.blob())).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
+// Older files' link (#import=..., gzipped JSON without photos).
 export async function entryFromLink(payload) {
   const gz = fromBase64(payload.replaceAll("-", "+").replaceAll("_", "/"), "application/gzip");
   const json = await new Response(gz.stream().pipeThrough(new DecompressionStream("gzip"))).text();
@@ -48,92 +36,129 @@ export async function entryFromLink(payload) {
   return entry;
 }
 
+const bytes = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 0xff); // Latin-1
+const deflate = async (data, way) =>
+  new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(way)).arrayBuffer());
+// A PDF text string in WinAnsi (Latin-1 here); anything else becomes "?".
+const pdfText = (s) => `(${s.replace(/[^\x20-\xff]/g, "?").replace(/[\\()]/g, "\\$&")})`;
+
 export async function scoreFile(entry) {
-  const images = [];
-  for (const blob of entry.images ?? []) images.push(await toBase64(await asJpeg(blob)));
+  const photos = [];
+  for (const blob of entry.images ?? []) photos.push(await asJpeg(blob));
   const doc = {
     format: FORMAT,
-    version: 1,
+    version: 2,
     id: entry.id,
     title: entry.title,
     created: entry.created,
     pages: entry.pages,
-    images,
+    photos: photos.length, // the PDF's own page images (marked /PartsongPhoto)
     settings: Object.fromEntries(SETTINGS.filter((k) => entry[k] !== undefined).map((k) => [k, entry[k]])),
   };
-  const title = entry.title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "Score";
-  const app = new URL("./", location.href).href;
+  const app = new URL("./", location.href).href.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
-  // Opened from WhatsApp/email, the button is a link carrying the score minus
-  // photos. With script, it also asks the app to fetch the photos from this
-  // page; if the app can't reach back (e.g. an installed app catches the link),
-  // it still has the score from the link.
-  const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(entry.title)} – Partsong score</title>
-<style>
-body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f0e4}
-h1{font-size:1.5rem;margin:0 0 .25em}
-.buttons{margin-top:1.5em}
-.btn{display:block;box-sizing:border-box;width:100%;margin:0 0 .75em;padding:14px;border:2px solid #2b2870;border-radius:12px;background:#fff;color:#2b2870;text-align:center;font:inherit;font-weight:600;font-size:1.1rem;text-decoration:none}
-.btn.primary{background:#2b2870;color:#fff}
-.small{font-size:.9rem;color:#6b6a66}
-a{color:#2b2870}
-</style>
-</head><body>
-<h1>${escapeHtml(entry.title)}</h1>
-<p>A <strong>Partsong</strong> score (${pages}) for learning your part.</p>
-<div class="buttons">
-<div id="send-box" hidden>
-<button id="send" class="btn primary">Open in the Partsong app</button>
-<button id="send-test" class="btn">Test: send a picture to the app</button>
-<p class="small">If you've installed Partsong on this phone: choose <em>Partsong</em> from the list that appears. Otherwise:</p>
-</div>
-<a id="open" class="btn primary" href="${app}#import=${await linkPayload(doc)}">Open in Partsong on the web</a>
-</div>
-<p class="small">Partsong (<a href="${app}">${app.replace(/^https?:\/\//, "")}</a>) asks before adding the score to your library.</p>
-<script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
-<script>
-document.getElementById("open").addEventListener("click", (e) => {
-  const json = document.getElementById("${FORMAT}").textContent;
-  const app = window.open(e.currentTarget.href + "&receive", "_blank");
-  if (!app) return; // popup blocked: follow the link instead
-  e.preventDefault();
-  addEventListener("message", function send(ev) {
-    if (ev.source !== app || ev.data !== "partsong-ready") return;
-    app.postMessage({ type: "partsong-score", json }, "*");
-    removeEventListener("message", send);
-  });
-});
-// The installed app can't reach back to this page for the photos, but it
-// takes the whole file from the share sheet, where the browser allows one here
-// (Android only: elsewhere an installed web app can't receive shared files).
-const file = new File(["<!doctype html>\\n" + document.documentElement.outerHTML], ${JSON.stringify(`${title}.partsong.html`).replaceAll("<", "\\u003c")}, { type: "text/html" });
-const send = document.getElementById("send");
-if (/Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
-  // Installed app users must use this one (the web link can't bring photos
-  // into the app), so it comes first.
-  document.getElementById("send-box").hidden = false;
-  document.getElementById("open").classList.remove("primary");
-  send.onclick = () => navigator.share({ files: [file] }).catch(() => {});
-  // TEMPORARY: does a picture shared from this page reach the app's share target?
-  document.getElementById("send-test").onclick = () => {
-    const c = document.createElement("canvas");
-    c.width = c.height = 200;
-    const g = c.getContext("2d");
-    g.fillStyle = "#2b2870";
-    g.fillRect(0, 0, 200, 200);
-    c.toBlob((b) => navigator.share({ files: [new File([b], "partsong-test.png", { type: "image/png" })] }).catch(() => {}), "image/png");
+  const lines = [
+    ["F2", 20, entry.title],
+    ["F1", 12, `A Partsong score (${pages}) for learning your part: ${app}`],
+    ["F1", 12, ""],
+    ["F1", 12, "To practise with it in Partsong:"],
+    ["F1", 12, "- Partsong app installed (Android): share this file to Partsong."],
+    ["F1", 12, `- Otherwise: open ${app}, tap Open file and choose this file.`],
+    ["F1", 12, "  On iPhone, first save it from WhatsApp with Share, then Save to Files."],
+  ];
+  const note = ["BT", "50 780 Td"];
+  for (const [i, [font, size, text]] of lines.entries()) note.push(`${i ? `0 -${size + 10} Td ` : ""}/${font} ${size} Tf ${pdfText(text)} Tj`);
+  note.push("ET");
+
+  // Objects: 1 catalog, 2 pages, 3 info, 4-5 fonts, 6 attachment, 7 its filespec,
+  // then per photo page: page, contents, image; then the note page and contents.
+  const parts = [];
+  const offsets = [];
+  let pos = 0;
+  const add = (b) => {
+    b = typeof b === "string" ? bytes(b) : b;
+    parts.push(b);
+    pos += b.length;
   };
-}
-</script>
-</body></html>
-`;
-  return new File([html], `${title}.partsong.html`, { type: "text/html" });
+  const obj = (n, dict, stream) => {
+    offsets[n] = pos;
+    add(`${n} 0 obj\n${dict}\n`);
+    if (stream) {
+      add("stream\n");
+      add(stream);
+      add("\nendstream\n");
+    }
+    add("endobj\n");
+  };
+  const pageIds = photos.map((_, i) => 8 + i * 3).concat(8 + photos.length * 3);
+  add("%PDF-1.7\n%\xe2\xe3\xcf\xd3\n");
+  const name = "(partsong-score.json)";
+  obj(1, `<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles << /Names [${name} 7 0 R] >> >> >>`);
+  obj(2, `<< /Type /Pages /Kids [${pageIds.map((n) => `${n} 0 R`).join(" ")}] /Count ${pageIds.length} >>`);
+  obj(3, `<< /Title ${pdfText(entry.title)} /Creator (Partsong) >>`);
+  obj(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+  obj(5, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+  const json = await deflate(JSON.stringify(doc), new CompressionStream("deflate"));
+  obj(6, `<< /Type /EmbeddedFile /Subtype /application#2Fjson /PartsongScore 1 /Filter /FlateDecode /Length ${json.length} >>`, json);
+  obj(7, `<< /Type /Filespec /F ${name} /UF ${name} /EF << /F 6 0 R >> /Desc (Partsong score: music and settings) >>`);
+  for (const [i, { jpeg, width, height }] of photos.entries()) {
+    const [page, contents, image] = [8 + i * 3, 9 + i * 3, 10 + i * 3];
+    const h = +((PAGE_WIDTH * height) / width).toFixed(2);
+    obj(page, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${h}] /Resources << /XObject << /Im ${image} 0 R >> >> /Contents ${contents} 0 R >>`);
+    const draw = bytes(`q ${PAGE_WIDTH} 0 0 ${h} 0 0 cm /Im Do Q`);
+    obj(contents, `<< /Length ${draw.length} >>`, draw);
+    const data = new Uint8Array(await jpeg.arrayBuffer());
+    obj(image, `<< /Type /XObject /Subtype /Image /PartsongPhoto ${i} /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${data.length} >>`, data);
+  }
+  const notePage = 8 + photos.length * 3;
+  const text = bytes(note.join("\n"));
+  obj(notePage, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents ${notePage + 1} 0 R >>`);
+  obj(notePage + 1, `<< /Length ${text.length} >>`, text);
+  const size = notePage + 2;
+  const xref = pos;
+  add(`xref\n0 ${size}\n0000000000 65535 f \n`);
+  for (let n = 1; n < size; n++) add(`${String(offsets[n]).padStart(10, "0")} 00000 n \n`);
+  add(`trailer\n<< /Size ${size} /Root 1 0 R /Info 3 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+
+  const title = entry.title.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim() || "Score";
+  return new File(parts, `${title}.partsong.pdf`, { type: "application/pdf" });
 }
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// The stream of the object whose dictionary contains `marker`, from index at.
+function streamAt(pdf, text, at) {
+  const dictEnd = text.indexOf(">>", at);
+  const length = Number(/\/Length (\d+)/.exec(text.slice(text.lastIndexOf("<<", at), dictEnd))?.[1]);
+  const m = /stream\r?\n/.exec(text.slice(dictEnd, dictEnd + 40));
+  if (!m || !length) return null;
+  const start = dictEnd + m.index + m[0].length;
+  return pdf.subarray(start, start + length);
+}
+
+// A library entry from a .partsong.pdf, or null if it's an ordinary PDF.
+async function readPdfScore(file) {
+  const pdf = new Uint8Array(await file.arrayBuffer());
+  const text = new TextDecoder("latin1").decode(pdf); // one char per byte
+  const at = text.indexOf("/PartsongScore");
+  if (at < 0) return null;
+  const packed = streamAt(pdf, text, at);
+  if (!packed) return null;
+  const entry = parseScoreFile(new TextDecoder().decode(await deflate(packed, new DecompressionStream("deflate"))));
+  if (!entry) return null;
+  const photos = [];
+  for (const m of text.matchAll(/\/PartsongPhoto (\d+)/g)) {
+    const data = streamAt(pdf, text, m.index);
+    if (data) photos[Number(m[1])] = new Blob([data], { type: "image/jpeg" });
+  }
+  entry.images = photos.filter(Boolean);
+  return entry;
+}
+
+// A library entry from any score file (.partsong.pdf, or an older
+// .partsong.html), or null if the file isn't one.
+export async function readScoreFile(file) {
+  const head = new TextDecoder().decode(await file.slice(0, 5).arrayBuffer());
+  if (head === "%PDF-") return readPdfScore(file);
+  return parseScoreFile(await file.text());
 }
 
 // Returns a library entry, or null if the text isn't a score file.

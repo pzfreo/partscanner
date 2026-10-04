@@ -42,22 +42,23 @@ then *Add to Home screen*.
   (bar highlight + playhead; the note marker and marking are on Pages) and take
   a tap on a bar as the start. Imported MusicXML opens on As read.
 - **Sharing** (`share.js`): the share icon (by the score title, or on each
-  library row) makes one `.partsong.html` file
-  (recognised MusicXML, photos re-encoded as JPEG, settings and marks) and hands
-  it to the share sheet (WhatsApp, Drive, email) or downloads it. Browsers only
-  share a few file types, hence HTML; opened elsewhere it's a page linking to the
-  app. *Open file* imports it. Imports never overwrite: if the score or its name is
-  already in the library, it's added as "Title (2)" etc. Opened in a
-  browser (tapping it in WhatsApp/email), the file shows *Open in Partsong on
-  the web*: a link carrying the score minus photos (`#import=…&receive`,
-  gzipped), and the app then asks the page for the full score. An installed app
-  caught by that link can't reach the page, so on Android the file leads with
-  *Open in the Partsong app*, which hands the file to the share sheet. A score
-  with photos is never added from the link alone: the app says to use the app
-  button instead. The app always asks before adding. The installed
-  app is also a share target (manifest `share_target` → service worker inbox):
-  shared score files are offered (and wait in the inbox until answered, since
-  Android can launch the app twice), shared PDFs/photos start a new scan.
+  library row) makes one `.partsong.pdf`: a real PDF of the page photos (JPEG,
+  marked `/PartsongPhoto n`) that any phone opens, with the recognised MusicXML,
+  settings and marks attached as `partsong-score.json` (`/PartsongScore`,
+  deflated), and a last page saying how to open it in Partsong. It goes to the
+  share sheet (WhatsApp, Drive, email) or downloads; browsers only share a few
+  file types, and PDF is the one that's readable everywhere and sent unchanged.
+  *Open file* imports it (an ordinary PDF there starts a new scan). Imports never
+  overwrite: if the score or its name is already in the library, it's added as
+  "Title (2)" etc. The installed app is also a share target (manifest
+  `share_target` → service worker inbox): shared score files are offered (and
+  wait in the inbox until answered, since Android can launch the app twice),
+  shared PDFs/photos start a new scan. Older `.partsong.html` files still open:
+  via *Open file*, sharing, or their page's button (which posts the full score
+  to the app); their link alone can't carry photos, so a score with photos isn't
+  added that way and the app says to share the file to Partsong instead.
+  `tests/drive-share.js`, `tests/drive-receive.js` (with
+  `tests/fixtures/legacy.partsong.html`), `tests/drive-share-target.js`.
 - **Delete** (bin icon on each library row, or in a score's settings) asks to
   confirm; locked scores can't be deleted.
 - **Make a copy** (copy icon on each library row): duplicates a score with its photos, marks and
