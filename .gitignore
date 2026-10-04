@@ -3,3 +3,4 @@ models/
 testdata/
 .DS_Store
 __pycache__/
+undefined-*.png

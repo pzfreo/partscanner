@@ -70,9 +70,9 @@ export async function scoreFile(entry) {
 <style>
 body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f0e4}
 h1{font-size:1.5rem;margin:0 0 .25em}
-.open{display:block;margin:1.5em 0 .75em;padding:16px;border-radius:12px;background:#26355e;color:#fff;text-align:center;font-weight:600;font-size:1.1rem;text-decoration:none}
+.open{display:block;margin:1.5em 0 .75em;padding:16px;border-radius:12px;background:#2b2870;color:#fff;text-align:center;font-weight:600;font-size:1.1rem;text-decoration:none}
 .small{font-size:.9rem;color:#6b6a66}
-a{color:#26355e}
+a{color:#2b2870}
 </style>
 </head><body>
 <h1>${escapeHtml(entry.title)}</h1>
