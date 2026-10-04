@@ -1717,5 +1717,6 @@ if (/^#(receive|import=)/.test(location.hash)) {
     .then(openInbox)
     .catch((e) => showError(`Couldn't open the shared file: ${e.message}`));
 } else {
-  renderLibrary().then(resumeUnfinished);
+  // A share whose launch never finished (e.g. stuck offline) is still waiting.
+  renderLibrary().then(async () => ((await (await caches.open("partscanner-inbox")).keys()).length ? openInbox() : resumeUnfinished()));
 }

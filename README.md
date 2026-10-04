@@ -166,6 +166,8 @@ python3 scripts/flaky-server.py 8768 --flaky &   # breaks every 3rd model respon
 node scripts/headless-test.mjs "http://localhost:8768/tests/omr-test.html?page=huron_1.png" out.json 380
 python3 scripts/flaky-server.py 8769 &
 node scripts/headless-test.mjs "http://localhost:8769/testdata/" out.json 480 tests/drive-download-resume.js shot
+python3 scripts/hang-server.py 8766 &   # /__hang?on makes requests hang, like a weak signal
+node scripts/headless-test.mjs "http://127.0.0.1:8766/index.html" out.json 120 tests/drive-slow-start.js shot
 CPU_THROTTLE=4 node scripts/headless-test.mjs "http://localhost:8765/index.html?view=switch" out.json 180 tests/drive-read-timing.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 700 tests/drive-resume.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-resume-manual.js shot
