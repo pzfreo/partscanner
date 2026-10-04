@@ -58,6 +58,20 @@ const k = document.createElement("iframe");
 k.src = "/index.html#receive";
 document.body.append(k);
 r.oldFileNoOpener = await waitFor(() => k.contentDocument?.querySelector("#error-toast:not([hidden])")?.textContent, 10000, "old-file error");
+// 4. Where the browser offers a share sheet, "Send it there" hands over the
+// whole file, photos included (share stubbed: headless has no share sheet).
+const { parseScoreFile } = await import("/share.js");
+const stub = `<script>Object.defineProperty(navigator, "userAgent", { value: "Android" }); navigator.canShare = () => true; navigator.share = async (d) => { parent.sharedFile = d.files[0]; };</script>`;
+const m = document.createElement("iframe");
+m.src = URL.createObjectURL(new Blob([(await file.text()).replace("<head>", "<head>" + stub)], { type: "text/html" }));
+document.body.append(m);
+await waitFor(() => m.contentDocument?.getElementById("send") && !m.contentDocument.getElementById("send").hidden, 10000, "send button");
+m.contentDocument.getElementById("send").click();
+await waitFor(() => window.sharedFile, 5000, "shared file");
+const resent = parseScoreFile(await window.sharedFile.text());
+r.sendButton = { name: window.sharedFile.name, images: resent.images.length, pages: resent.pages.length, tempo: resent.tempo };
+// Not on Android (desktop share menus can't reach the app): hidden.
+r.sendHiddenWithoutShare = f.contentDocument.getElementById("send").hidden;
 // A fresh device (score not present): the link imports without photos.
 const { entryFromLink } = await import("/share.js");
 const fresh = await entryFromLink(link.href.split("#import=")[1]);

@@ -72,6 +72,7 @@ export async function scoreFile(entry) {
 body{font:17px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b;background:#f6f0e4}
 h1{font-size:1.5rem;margin:0 0 .25em}
 .open{display:block;margin:1.5em 0 .75em;padding:16px;border-radius:12px;background:#2b2870;color:#fff;text-align:center;font-weight:600;font-size:1.1rem;text-decoration:none}
+.send{display:block;width:100%;margin:0 0 .75em;padding:14px;border:2px solid #2b2870;border-radius:12px;background:#fff;color:#2b2870;font:inherit;font-weight:600}
 .small{font-size:.9rem;color:#6b6a66}
 a{color:#2b2870}
 </style>
@@ -79,6 +80,7 @@ a{color:#2b2870}
 <h1>${escapeHtml(entry.title)}</h1>
 <p>A <strong>Partsong</strong> score (${pages}) for learning your part.</p>
 <a id="open" class="open" href="${app}#import=${await linkPayload(doc)}">Open in Partsong</a>
+<button id="send" class="send" hidden>Have the Partsong app? Send it there</button>
 <p class="small">Partsong (<a href="${app}">${app.replace(/^https?:\/\//, "")}</a>) opens and asks to add the score to your library.</p>
 <script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
 <script>
@@ -93,6 +95,15 @@ document.getElementById("open").addEventListener("click", (e) => {
     removeEventListener("message", send);
   });
 });
+// The installed app can't reach back to this page for the photos, but it
+// takes the whole file from the share sheet, where the browser allows one here
+// (Android only: elsewhere an installed web app can't receive shared files).
+const file = new File(["<!doctype html>\\n" + document.documentElement.outerHTML], ${JSON.stringify(`${title}.partsong.html`).replaceAll("<", "\\u003c")}, { type: "text/html" });
+const send = document.getElementById("send");
+if (/Android/.test(navigator.userAgent) && navigator.canShare?.({ files: [file] })) {
+  send.hidden = false;
+  send.onclick = () => navigator.share({ files: [file] }).catch(() => {});
+}
 </script>
 </body></html>
 `;
