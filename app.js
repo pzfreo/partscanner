@@ -115,8 +115,11 @@ async function renderLibrary() {
         const b = document.createElement("button");
         const n = entry.pages.length;
         const done = entry.pages.filter(Boolean).length;
-        const info = entry.pending ? `Reading… ${done} of ${n}` : `${n} page${n > 1 ? "s" : ""}`;
-        b.innerHTML = `<span class="thumb"></span><span class="name"></span><small>${info}</small>`;
+        const marked = Object.keys(entry.manual ?? {}).length;
+        const info = entry.pending
+          ? `Reading… ${done} of ${n}`
+          : `${n} page${n > 1 ? "s" : ""}${marked ? ` · ${marked} system${marked > 1 ? "s" : ""} marked` : ""}`;
+        b.innerHTML = `<span class="thumb"></span><span class="meta"><span class="name"></span><small>${info}</small></span>`;
         b.querySelector(".name").textContent = (entry.locked ? "🔒 " : "") + entry.title;
         if (entry.images?.length) {
           const img = document.createElement("img");
