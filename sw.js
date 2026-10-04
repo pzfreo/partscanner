@@ -52,7 +52,8 @@ self.addEventListener("fetch", (e) => {
         // Android can launch the app twice for one share, and the page may
         // already have looked in the inbox: tell open pages it has changed.
         for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "inbox" });
-        return Response.redirect(new URL("./?inbox", self.registration.scope).href, 303);
+        // ?inbox=<files stored> (the count is for the temporary share check).
+        return Response.redirect(new URL(`./?inbox=${i}`, self.registration.scope).href, 303);
       })(),
     );
     return;

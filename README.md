@@ -52,9 +52,9 @@ then *Add to Home screen*.
   the web*: a link carrying the score minus photos (`#import=…&receive`,
   gzipped), and the app then asks the page for the full score. An installed app
   caught by that link can't reach the page, so on Android the file leads with
-  steps to share the file itself to the app from the message (a share from the
-  page arrives without the file). A score with photos is never added from the
-  link alone: the app gives the same steps instead. The app always asks before adding. The installed
+  *Open in the Partsong app*, which hands the file to the share sheet. A score
+  with photos is never added from the link alone: the app says to use the app
+  button instead. The app always asks before adding. The installed
   app is also a share target (manifest `share_target` → service worker inbox):
   shared score files are offered (and wait in the inbox until answered, since
   Android can launch the app twice), shared PDFs/photos start a new scan.

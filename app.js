@@ -887,13 +887,32 @@ async function offerImport(entry, done = () => {}) {
   };
 }
 
+// TEMPORARY share check: a visible trail of what each share launch received,
+// to find where sharing from the file page fails on a phone. Remove once found.
+const shareTrail = (() => {
+  try {
+    return JSON.parse(localStorage.getItem("partsong.sharetrail") || "[]");
+  } catch {
+    return [];
+  }
+})();
+function shareCheck(msg) {
+  shareTrail.push(`${new Date().toLocaleTimeString()} ${msg}`);
+  shareTrail.splice(0, shareTrail.length - 6);
+  try {
+    localStorage.setItem("partsong.sharetrail", JSON.stringify(shareTrail));
+  } catch {}
+  $("library-status").textContent = "Share check: " + shareTrail.join(" · ");
+}
+
 // Files shared to the installed app arrive via the service worker's inbox.
 // A score file asks first, as from its page's link, and stays in the inbox
 // until answered: Android can launch the app twice for one share, and the
 // second launch reloads the page.
-async function openInbox() {
+async function openInbox(why = "") {
   const cache = await caches.open("partscanner-inbox");
   const keys = await cache.keys();
+  if (why || keys.length) shareCheck(`${why || "looked"}: ${keys.length} waiting`);
   if (!keys.length) return;
   const scans = [];
   const others = [];
@@ -902,7 +921,9 @@ async function openInbox() {
     const name = decodeURIComponent(res.headers.get("x-name") || "shared");
     const f = new File([await res.blob()], name, { type: res.headers.get("content-type") || "" });
     const shared = parseScoreFile(await f.text().catch(() => ""));
+    if (!shared) shareCheck(`not a score: ${name} (${f.size} bytes)`);
     if (shared) {
+      shareCheck(`offered ${shared.title}`);
       await offerImport(shared, () => cache.delete(req));
       continue;
     }
@@ -919,7 +940,7 @@ async function openInbox() {
 
 // A share can land after the page has looked (see above), or while it's in
 // the background: look again when told, and when it comes back to the screen.
-navigator.serviceWorker?.addEventListener("message", (e) => e.data?.type === "inbox" && openInbox());
+navigator.serviceWorker?.addEventListener("message", (e) => e.data?.type === "inbox" && openInbox("landed while open"));
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && "caches" in window && openInbox());
 
 // ---------- practice ----------
@@ -1741,9 +1762,10 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost") {
 if (/^#(receive|import=)/.test(location.hash)) {
   renderLibrary().then(receiveFromPage);
 } else if (new URLSearchParams(location.search).has("inbox")) {
+  const stored = new URLSearchParams(location.search).get("inbox");
   history.replaceState(null, "", location.pathname);
   renderLibrary()
-    .then(openInbox)
+    .then(() => openInbox(`launched by share, ${stored || "?"} file(s) stored`))
     .catch((e) => showError(`Couldn't open the shared file: ${e.message}`));
 } else {
   // A share whose launch never finished (e.g. stuck offline) is still waiting.
