@@ -48,5 +48,15 @@
         }
       ]
     }
-  }
+  },
+  "file_handlers": [
+    {
+      "action": "./?open-file",
+      "accept": {
+        "application/pdf": [
+          ".pdf"
+        ]
+      }
+    }
+  ]
 }

@@ -57,6 +57,10 @@ then *Add to Home screen*.
   via *Open file*, sharing, or their page's button (which posts the full score
   to the app); their link alone can't carry photos, so a score with photos isn't
   added that way and the app says to share the file to Partsong instead.
+  Partsong is also registered to open PDFs (manifest `file_handlers` +
+  `launchQueue`: desktop Chrome/Edge, and Android where Chrome supports it), so
+  it appears under "Open with"; a score is offered, an ordinary PDF scanned
+  (`tests/drive-open-with.js`).
   `tests/drive-share.js`, `tests/drive-receive.js` (with
   `tests/fixtures/legacy.partsong.html`), `tests/drive-share-target.js`.
 - **Delete** (bin icon on each library row, or in a score's settings) asks to
@@ -151,6 +155,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 400 t
 node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" out.json 100
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 120 tests/drive-open-with.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-manual.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-lock.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-views.js shot

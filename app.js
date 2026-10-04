@@ -1754,7 +1754,28 @@ if (/^#(receive|import=)/.test(location.hash)) {
   renderLibrary()
     .then(openInbox)
     .catch((e) => showError(`Couldn't open the shared file: ${e.message}`));
+} else if (new URLSearchParams(location.search).has("open-file")) {
+  // The files themselves come through launchQueue (above).
+  history.replaceState(null, "", location.pathname);
+  renderLibrary();
 } else {
   // A share whose launch never finished (e.g. stuck offline) is still waiting.
   renderLibrary().then(async () => ((await (await caches.open("partscanner-inbox")).keys()).length ? openInbox() : resumeUnfinished()));
 }
+
+// PDFs opened with Partsong from the system's "Open with" (manifest
+// file_handlers: desktop Chrome/Edge, and Android where Chrome supports it):
+// a score file is offered, an ordinary PDF starts a new scan.
+window.launchQueue?.setConsumer(async ({ files: handles }) => {
+  const scans = [];
+  for (const handle of handles ?? []) {
+    const f = await handle.getFile();
+    const shared = await readScoreFile(f).catch(() => null);
+    if (shared) await offerImport(shared);
+    else scans.push(f);
+  }
+  if (scans.length) {
+    loadScan();
+    await addFiles(scans);
+  }
+});
