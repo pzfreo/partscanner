@@ -376,6 +376,7 @@ function openScore(entry, nav = "push") {
   player.onPosition = (beat) => {
     $("position").textContent = `Bar ${barAt(beat).number}`;
     follow(beat);
+    followRead(beat);
   };
   player.onEnd = () => setPlaying(false);
   player.mix = (lineId, t) => {
@@ -510,6 +511,8 @@ function follow(beat, playing = true) {
 function showBar(beat) {
   followedBar = null;
   follow(beat, false);
+  readBar = null;
+  followRead(beat, false);
 }
 
 function keepInView(el) {
@@ -857,13 +860,106 @@ $("delete").onclick = () => {
 
 // ---------- Pages / As read ----------
 
+// Follow-along on the As read view: OSMD knows where it drew each bar.
+let readViews = []; // per page: { osmd, div, bar, playhead }
+let readBar = null;
+
+function readMark(cls) {
+  const el = document.createElement("div");
+  el.className = cls;
+  el.hidden = true;
+  return el;
+}
+
+// Bar `i` of a rendered page, in pixels within its container.
+function readBarBox(view, i) {
+  const staves = view.osmd.GraphicSheet?.MeasureList?.[i];
+  if (!staves) return null;
+  const unit = 10 * view.osmd.zoom; // OSMD units -> px
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  let lead = 0; // clef/key/time at the start of a system
+  for (const m of staves) {
+    const ps = m?.PositionAndShape;
+    if (!ps) continue;
+    lead = Math.max(lead, m.beginInstructionsWidth || 0);
+    x0 = Math.min(x0, ps.AbsolutePosition.x + ps.BorderLeft);
+    x1 = Math.max(x1, ps.AbsolutePosition.x + ps.BorderRight);
+    y0 = Math.min(y0, ps.AbsolutePosition.y + ps.BorderTop);
+    y1 = Math.max(y1, ps.AbsolutePosition.y + ps.BorderBottom);
+  }
+  if (x0 === Infinity) return null;
+  const pad = 6;
+  const svg = view.div.querySelector("svg");
+  const ox = svg ? svg.getBoundingClientRect().left - view.div.getBoundingClientRect().left : 0;
+  const oy = svg ? svg.getBoundingClientRect().top - view.div.getBoundingClientRect().top : 0;
+  return { x: ox + x0 * unit, y: oy + y0 * unit - pad, w: (x1 - x0) * unit, h: (y1 - y0) * unit + 2 * pad, lead: lead * unit };
+}
+
+function place(el, { x, y, w, h }) {
+  Object.assign(el.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${h}px` });
+  el.hidden = false;
+}
+
+function followRead(beat, playing = true) {
+  if ($("read-view").hidden || !readViews.length) return;
+  const bar = barAt(beat);
+  const view = readViews[bar.sheet];
+  const box = view && readBarBox(view, bar.sheetBar);
+  if (!box) return;
+  if (bar !== readBar) {
+    for (const v of readViews) v.bar.hidden = v.playhead.hidden = true;
+    place(view.bar, box);
+    readBar = bar;
+    if (playing) keepInView(view.bar);
+  }
+  if (!playing) return;
+  const from = box.x + box.lead;
+  const x = from + ((box.w - box.lead) * Math.min(1, Math.max(0, beat - bar.start))) / bar.length;
+  place(view.playhead, { x: x - 1.5, y: box.y, w: 3, h: box.h });
+}
+
+// homr numbers each page's bars from 1; renumber to match the bar counter.
+function numberBars(xml, first) {
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  for (const part of doc.querySelectorAll("part")) {
+    [...part.children].filter((m) => m.tagName === "measure").forEach((m, i) => m.setAttribute("number", first + i));
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+
+// Tap a bar in the As read view to start from it.
+function pickReadBar(sheet, e) {
+  const view = readViews[sheet];
+  const r = view.div.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+  let best = null;
+  let bestDist = Infinity;
+  for (const bar of score.measures) {
+    if (bar.sheet !== sheet) continue;
+    const b = readBarBox(view, bar.sheetBar);
+    if (!b) continue;
+    const dx = Math.max(b.x - x, 0, x - (b.x + b.w));
+    const dy = Math.max(b.y - y, 0, y - (b.y + b.h));
+    if (dx * dx + dy * dy < bestDist) [best, bestDist] = [bar, dx * dx + dy * dy];
+  }
+  if (!best) return;
+  $("from-bar").value = best.number;
+  if (Number($("to-bar").value) < best.number) $("to-bar").value = score.measures.length;
+  $("from-bar").onchange();
+}
+
 function setView(view) {
   const pages = view === "pages";
   $("follow").hidden = !pages;
   $("read-view").hidden = pages;
   $("view-pages").setAttribute("aria-selected", String(pages));
   $("view-read").setAttribute("aria-selected", String(!pages));
-  if (!pages) renderRead();
+  if (!pages) {
+    renderRead();
+    readBar = null;
+    followRead(player?.playing ? player.position() : barRange()[0], !!player?.playing);
+  }
 }
 $("view-pages").onclick = () => setView("pages");
 $("view-read").onclick = () => setView("read");
@@ -875,6 +971,8 @@ async function renderRead() {
   if (osmdFor === current) return;
   const entry = (osmdFor = current);
   $("osmd").replaceChildren();
+  readViews = [];
+  readBar = null;
   osmdLoaded ??= new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = OSMD_URL;
@@ -890,16 +988,24 @@ async function renderRead() {
     for (const xml of entry.pages) {
       if (osmdFor !== entry) return; // another score was opened meanwhile
       const div = document.createElement("div");
+      div.className = "read-page";
       $("osmd").append(div);
       const osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(div, {
         autoResize: false,
         drawTitle: false,
         drawPartNames: false,
       });
-      await osmd.load(xml);
+      osmd.EngravingRules.UseXMLMeasureNumbers = true;
+      await osmd.load(numberBars(xml, score.measures.find((b) => b.sheet === readViews.length)?.number ?? 1));
       osmd.zoom = 0.6;
       osmd.render();
+      const sheet = readViews.length;
+      const view = { osmd, div, bar: readMark("read-bar"), playhead: readMark("read-playhead") };
+      div.append(view.bar, view.playhead);
+      div.onclick = (e) => pickReadBar(sheet, e);
+      readViews.push(view);
     }
+    showBar(barRange()[0]);
   } catch (e) {
     osmdFor = null;
     $("osmd").textContent = e.message;

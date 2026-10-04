@@ -191,15 +191,16 @@ export function buildScore(pages) {
   const measures = [];
   const pageMeasureStart = [];
   let t = 0;
-  for (const page of pages) {
+  pages.forEach((page, sheet) => {
     pageMeasureStart.push(measures.length);
     const count = Math.max(0, ...page.parts.map((p) => p.measures.length));
     for (let i = 0; i < count; i++) {
       const length = Math.max(...page.parts.map((p) => p.measures[i]?.length ?? 0)) || 2;
-      measures.push({ number: measures.length + 1, start: t, length });
+      // sheet/sheetBar: which page's MusicXML, and which bar in it (for the As read view)
+      measures.push({ number: measures.length + 1, start: t, length, sheet, sheetBar: i });
       t += length;
     }
-  }
+  });
 
   // Where each bar sits on its photo: a box around its notes, and the x of
   // each onset so a playhead can move through it.

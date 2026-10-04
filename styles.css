@@ -229,6 +229,12 @@ details { margin-top: 24px; }
 .view-switch button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
 .follow { margin-top: 12px; }
 .read-view { margin-top: 12px; }
+.read-view .muted { margin: 0 0 8px; }
+.read-page { position: relative; cursor: pointer; }
+.read-bar, .read-playhead { position: absolute; pointer-events: none; }
+.read-bar[hidden], .read-playhead[hidden] { display: none; }
+.read-bar { background: rgb(31 78 95 / 0.12); border: 2px solid #1f4e5f; border-radius: 4px; }
+.read-playhead { background: #e0902a; border-radius: 2px; }
 .photo-list { display: grid; gap: 8px; }
 .photo-list .page { position: relative; }
 .photo-list img { width: 100%; display: block; border-radius: 8px; border: 1px solid var(--border); }
