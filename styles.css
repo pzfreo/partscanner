@@ -220,6 +220,7 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 }
 .panel[hidden] { display: block; visibility: hidden; transform: translateY(110%); }
 .panel > * { max-width: 608px; margin-left: auto; margin-right: auto; }
+.share-row { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
 .panel .danger { margin: 24px auto 8px; display: flex; }
 
 details { margin-top: 24px; }

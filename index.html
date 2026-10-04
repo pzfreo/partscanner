@@ -21,7 +21,7 @@
     <section id="home">
       <div class="actions">
         <button id="new-scan" class="primary">Scan music</button>
-        <label class="button">Open MusicXML<input id="open-xml" type="file" accept=".musicxml,.xml,application/vnd.recordare.musicxml+xml" multiple hidden></label>
+        <label class="button">Open file<input id="open-xml" type="file" accept=".html,text/html,.musicxml,.xml,application/vnd.recordare.musicxml+xml" multiple hidden></label>
       </div>
       <h2>Your scores</h2>
       <ul id="library" class="library"></ul>
@@ -94,6 +94,10 @@
           </div>
         </div>
 
+        <div class="share-row">
+          <button id="share">Share this score</button>
+          <span id="share-status" class="muted" aria-live="polite"></span>
+        </div>
         <button id="delete" class="danger">Delete score</button>
       </div>
 

@@ -36,6 +36,13 @@ then *Add to Home screen*.
   with OpenSheetMusicDisplay (to spot recognition errors). Both follow along
   (bar highlight + playhead; the note marker and marking are on Pages) and take
   a tap on a bar as the start. Imported MusicXML opens on As read.
+- **Sharing** (`share.js`): *Share this score* makes one `.partscore.html` file
+  (recognised MusicXML, photos re-encoded as JPEG, settings and marks) and hands
+  it to the share sheet (WhatsApp, Drive, email) or downloads it. Browsers only
+  share a few file types, hence HTML; opened elsewhere it's a page linking to the
+  app. *Open file* imports it; a score with the same id is replaced. The installed
+  app is also a share target (manifest `share_target` → service worker inbox):
+  shared score files open, shared PDFs/photos start a new scan.
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
@@ -91,6 +98,8 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 t
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-lock.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-views.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-read-follow.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-share.js shot
+node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 180 tests/drive-share-target.js shot
 CPU_THROTTLE=4 node scripts/headless-test.mjs "http://localhost:8765/index.html?view=switch" out.json 180 tests/drive-read-timing.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 700 tests/drive-resume.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-resume-manual.js shot

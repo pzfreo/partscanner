@@ -3,6 +3,7 @@ import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
+import { parseScoreFile, scoreFile, shareFile } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 const OSMD_URL = "https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@2.2.0/build/opensheetmusicdisplay.min.js";
@@ -348,10 +349,28 @@ async function readScan() {
 $("open-xml").onchange = async (e) => {
   const files = [...e.target.files];
   e.target.value = "";
-  if (!files.length) return;
+  if (files.length) openFiles(files);
+};
+
+// Score files (shared from Part Scanner) and MusicXML, from the picker or the
+// share sheet.
+async function openFiles(files) {
   try {
-    const xmls = await Promise.all(files.map((f) => f.text()));
-    const title = parsePage(xmls[0]).title || files[0].name.replace(/\.(musicxml|xml)$/i, "");
+    const xmls = [];
+    let name = "";
+    for (const f of files) {
+      const text = await f.text();
+      const shared = parseScoreFile(text);
+      if (shared) {
+        await importScore(shared);
+        continue;
+      }
+      parsePage(text); // throws if it isn't MusicXML
+      xmls.push(text);
+      name ||= f.name.replace(/\.(musicxml|xml)$/i, "");
+    }
+    if (!xmls.length) return;
+    const title = parsePage(xmls[0]).title || name || "Imported score";
     const entry = { id: crypto.randomUUID(), title, created: Date.now(), pages: xmls, images: [] };
     await db.put(entry);
     openScore(entry);
@@ -359,7 +378,50 @@ $("open-xml").onchange = async (e) => {
     $("library-empty").hidden = false;
     $("library-empty").textContent = `Couldn't open that file: ${err.message}`;
   }
+}
+
+// A shared score keeps its id, so receiving a newer copy replaces the old one.
+async function importScore(entry) {
+  await db.put(entry);
+  openScore(entry);
+}
+
+$("share").onclick = async () => {
+  $("share").disabled = true;
+  $("share-status").textContent = "Preparing…";
+  try {
+    const entry = (await db.all()).find((e) => e.id === current.id) ?? current;
+    const how = await shareFile(await scoreFile(entry), entry.title);
+    $("share-status").textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "" }[how];
+  } catch (e) {
+    $("share-status").textContent = `Couldn't share: ${e.message}`;
+  } finally {
+    $("share").disabled = false;
+  }
 };
+
+// Files shared to the installed app arrive via the service worker's inbox.
+async function openInbox() {
+  const cache = await caches.open("partscanner-inbox");
+  const files = [];
+  for (const req of await cache.keys()) {
+    const res = await cache.match(req);
+    const name = decodeURIComponent(res.headers.get("x-name") || "shared");
+    files.push(new File([await res.blob()], name, { type: res.headers.get("content-type") || "" }));
+    await cache.delete(req);
+  }
+  const scans = [];
+  const others = [];
+  for (const f of files) {
+    if (f.type.startsWith("image/") || (await isPdf(f))) scans.push(f);
+    else others.push(f);
+  }
+  if (others.length) await openFiles(others);
+  if (scans.length) {
+    loadScan();
+    await addFiles(scans);
+  }
+}
 
 // ---------- practice ----------
 
@@ -1034,4 +1096,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost") {
   navigator.serviceWorker.register("sw.js");
 }
 
-renderLibrary().then(resumeUnfinished);
+if (new URLSearchParams(location.search).has("inbox")) {
+  history.replaceState(null, "", location.pathname);
+  renderLibrary().then(openInbox);
+} else {
+  renderLibrary().then(resumeUnfinished);
+}

@@ -13,6 +13,7 @@ const SHELL_FILES = [
   "db.js",
   "orient.js",
   "pdf-pages.js",
+  "share.js",
   "styles.css",
   "omr-worker.js",
   "omr/onnxruntime.py",
@@ -31,6 +32,24 @@ self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
+  // Android share sheet -> installed app (manifest share_target): stash the
+  // files for the page to pick up, then open the app.
+  if (e.request.method === "POST" && url.pathname.endsWith("/share-target")) {
+    e.respondWith(
+      (async () => {
+        const form = await e.request.formData();
+        const cache = await caches.open("partscanner-inbox");
+        let i = 0;
+        for (const f of form.getAll("files")) {
+          if (!(f instanceof File)) continue;
+          const headers = { "content-type": f.type, "x-name": encodeURIComponent(f.name) };
+          await cache.put(`inbox/${Date.now()}-${i++}`, new Response(f, { headers }));
+        }
+        return Response.redirect(new URL("./?inbox", self.registration.scope).href, 303);
+      })(),
+    );
+    return;
+  }
   if (e.request.method !== "GET") return;
   if (url.hostname === "cdn.jsdelivr.net") {
     e.respondWith(
