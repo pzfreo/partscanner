@@ -1,4 +1,6 @@
-// Web Audio playback of score lines with per-line volume.
+// Web Audio playback of score lines. `mix(lineId, t)` decides each note's
+// volume (0 = silent) and octave shift when it is scheduled, so your part can
+// change from system to system.
 
 const LOOKAHEAD = 0.25; // seconds scheduled ahead
 const TICK_MS = 50;
@@ -9,7 +11,7 @@ export class Player {
   constructor(score) {
     this.score = score;
     this.bpm = 80;
-    this.gains = score.lines.map(() => 1);
+    this.mix = () => ({ gain: 1, shift: 0 });
     this.ctx = null;
     this.playing = false;
     this.onPosition = null;
@@ -23,17 +25,6 @@ export class Player {
     this.master.gain.value = 0.8;
     const comp = this.ctx.createDynamicsCompressor();
     this.master.connect(comp).connect(this.ctx.destination);
-    this.lineNodes = this.score.lines.map((_, i) => {
-      const g = this.ctx.createGain();
-      g.gain.value = this.gains[i];
-      g.connect(this.master);
-      return g;
-    });
-  }
-
-  setGain(lineId, value) {
-    this.gains[lineId] = value;
-    if (this.ctx) this.lineNodes[lineId].gain.setTargetAtTime(value, this.ctx.currentTime, 0.02);
   }
 
   setTempo(bpm) {
@@ -89,7 +80,10 @@ export class Player {
         for (const n of line.notes) {
           if (n.t >= from && n.t < to) {
             const dur = Math.min(n.dur, this.loopEnd - n.t);
-            this.note(i, n.midi, this.startTime + (n.t - this.startBeat) * secPerBeat, dur * secPerBeat);
+            const { gain, shift = 0 } = this.mix(i, n.t);
+            if (gain > 0) {
+              this.note(n.midi + shift, gain, this.startTime + (n.t - this.startBeat) * secPerBeat, dur * secPerBeat);
+            }
           }
         }
       });
@@ -107,7 +101,7 @@ export class Player {
     }
   }
 
-  note(lineId, midi, when, duration) {
+  note(midi, gain, when, duration) {
     const ctx = this.ctx;
     const osc = ctx.createOscillator();
     osc.type = "triangle";
@@ -115,10 +109,10 @@ export class Player {
     const env = ctx.createGain();
     const end = when + Math.max(0.05, duration - 0.03);
     env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(0.25, when + 0.015);
-    env.gain.setTargetAtTime(0.18, when + 0.015, 0.1);
+    env.gain.linearRampToValueAtTime(0.25 * gain, when + 0.015);
+    env.gain.setTargetAtTime(0.18 * gain, when + 0.015, 0.1);
     env.gain.setTargetAtTime(0, end, 0.02);
-    osc.connect(env).connect(this.lineNodes[lineId]);
+    osc.connect(env).connect(this.master);
     osc.start(when);
     osc.stop(end + 0.15);
     this.active ??= [];

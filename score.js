@@ -137,8 +137,42 @@ function mergeTies(notes) {
 const sameLine = (a, b) =>
   a.length === b.length && a.every((n, i) => n.t === b[i].t && n.midi === b[i].midi && n.dur === b[i].dur);
 
+const barX0 = (m) => {
+  const xs = m.notes.filter((n) => n.pos).map((n) => n.pos.x);
+  return xs.length ? Math.min(...xs) : null;
+};
+
+// homr sometimes splits one bar in two for a single part, shifting that part
+// against the others for the rest of the page. When parts on a page disagree
+// on bar count, a bar is merged into the previous one if it starts on the
+// same row but clearly before the reference part's next bar.
+function alignBars(page) {
+  const counts = page.parts.map((p) => p.measures.length);
+  if (new Set(counts).size < 2) return;
+  const mode = counts.sort((a, b) => counts.filter((c) => c === b).length - counts.filter((c) => c === a).length)[0];
+  const ref = page.parts.find((p) => p.measures.length === mode).measures.map(barX0);
+  const xs = page.parts.flatMap((p) => p.measures.flatMap((m) => m.notes.filter((n) => n.pos).map((n) => n.pos.x)));
+  const tol = (Math.max(...xs) - Math.min(...xs)) * 0.03;
+  for (const part of page.parts) {
+    if (part.measures.length <= mode) continue;
+    const out = [];
+    for (const m of part.measures) {
+      const prev = out.at(-1);
+      const x0 = barX0(m);
+      const nextRef = ref[out.length];
+      const px0 = prev && barX0(prev);
+      if (prev && x0 != null && px0 != null && nextRef != null && x0 > px0 && x0 < nextRef - tol) {
+        prev.notes.push(...m.notes.map((n) => ({ ...n, start: n.start + prev.length })));
+        prev.length += m.length;
+      } else out.push({ ...m, notes: [...m.notes] });
+    }
+    part.measures = out;
+  }
+}
+
 // pages: array of parsePage() results, in page order.
 export function buildScore(pages) {
+  pages.forEach(alignBars);
   // Match parts across pages by staff layout: the k-th 2-staff part on each
   // page is the same part, etc. Pages may lack a part (e.g. a solo line).
   const partInfo = new Map();
@@ -226,8 +260,10 @@ export function buildScore(pages) {
       });
       const h = mergeTies(high);
       const l = mergeTies(low);
-      if (h.length) partLines.push({ staff, notes: h });
-      if (l.length && !sameLine(h, l)) partLines.push({ staff, notes: l });
+      const twoVoices = l.length && !sameLine(h, l);
+      const staffKey = `${info.key}/${staff}`;
+      if (h.length) partLines.push({ staff, staffKey, voice: twoVoices ? "upper" : "only", notes: h });
+      if (twoVoices) partLines.push({ staff, staffKey, voice: "lower", notes: l });
     }
     lines.push(...labelLines(partLines, info, orderedParts.length));
   }
@@ -235,7 +271,52 @@ export function buildScore(pages) {
     ["Soprano", "Alto", "Tenor", "Bass"].forEach((name, i) => (lines[i].label = name));
   }
   lines.forEach((l, i) => (l.id = i));
-  return { title: pages.find((p) => p.title)?.title || "", measures, lines, length: t };
+  const systems = findSystems(measures, lines);
+  return { title: pages.find((p) => p.title)?.title || "", measures, lines, systems, length: t };
+}
+
+// Groups bars into systems (one row of music on a page): a new system starts
+// on a new page or when a bar sits left of the previous one. For each system,
+// lists its staves top to bottom with their extent on the photo and the lines
+// (voices) on each, so a tap can be mapped to a staff and voice.
+function findSystems(measures, lines) {
+  const systems = [];
+  let cur = null;
+  let lastBox = null;
+  let lastPage = null;
+  for (const bar of measures) {
+    const startsRow = bar.box && (bar.page !== lastPage || bar.box.x0 < lastBox.x0);
+    if (!cur || startsRow) {
+      cur = { index: systems.length, page: bar.page ?? lastPage, start: bar.start, bars: [] };
+      systems.push(cur);
+    }
+    cur.bars.push(bar);
+    cur.end = bar.start + bar.length;
+    bar.system = cur.index;
+    if (bar.box) {
+      const b = bar.box;
+      cur.box = cur.box
+        ? { x0: Math.min(cur.box.x0, b.x0), y0: Math.min(cur.box.y0, b.y0), x1: Math.max(cur.box.x1, b.x1), y1: Math.max(cur.box.y1, b.y1) }
+        : { ...b };
+      lastBox = b;
+      lastPage = bar.page;
+    }
+  }
+  for (const sys of systems) {
+    const staves = new Map();
+    for (const line of lines) {
+      for (const n of line.notes) {
+        if (n.t < sys.start || n.t >= sys.end || n.pos?.page !== sys.page) continue;
+        const st = staves.get(line.staffKey) ?? { key: line.staffKey, y0: Infinity, y1: -Infinity, lines: new Set() };
+        st.y0 = Math.min(st.y0, n.pos.y);
+        st.y1 = Math.max(st.y1, n.pos.y);
+        st.lines.add(line.id);
+        staves.set(line.staffKey, st);
+      }
+    }
+    sys.staves = [...staves.values()].map((st) => ({ ...st, lines: [...st.lines] })).sort((a, b) => a.y0 - b.y0);
+  }
+  return systems;
 }
 
 function labelLines(partLines, info, partCount) {

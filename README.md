@@ -20,11 +20,19 @@ then *Add to Home screen*.
   calls via JSPI, so it needs **Chrome/Edge 137+** (current Chrome on Android
   is fine).
 - **Models**: ~157 MB, downloaded once on first scan and kept in Cache Storage.
-- **Parts** (`score.js`): each page is recognised separately; parts are
-  matched across pages by staff layout, so a solo staff that only appears on
-  some pages doesn't break the merge. Each staff is split into an upper and a
-  lower line by note onset (homr's voice numbers aren't reliable).
-- **Playback** (`player.js`): Web Audio, per-part volume, tempo, bar range, loop.
+- **Parts** (`score.js`): each page is recognised separately. Bars are lined up
+  across a page's parts by position (homr occasionally splits a bar for one
+  part). Each staff is split into an upper and a lower voice by note onset
+  (homr's voice numbers aren't reliable), and bars are grouped into systems.
+- **Choosing your part**: *Auto* matches parts across pages by staff layout and
+  lets you pick one from a list (fine for SATB on two staves). *Manual* is for
+  scores whose voicing changes (open scores, verse-by-verse voicing): tap a staff
+  on the music to mark it as yours in that system, choosing upper/lower voice on
+  shared staves. Unmarked systems have no part of yours. Your part plays at full
+  volume, the others at the "Other parts" level; a pitch option shifts your part
+  an octave (homr doesn't know the tenor clef's octave).
+- **Playback** (`player.js`): Web Audio; each note's volume and octave come from
+  the app at scheduling time; tempo, bar range, loop.
 - **Follow along**: homr records where each note sits in the photo
   (`<!-- imgpos -->` comments), so playback highlights the current bar on your
   own pages, with a playhead and a marker on your part's note, and auto-scrolls.
@@ -59,7 +67,7 @@ each page's pixels turned 90° anticlockwise, saved with EXIF orientation 1, 3 o
 
 ```sh
 node scripts/headless-test.mjs "http://localhost:8765/tests/omr-test.html?page=huron_1.png" out.json
-node scripts/headless-test.mjs "http://localhost:8765/tests/score-test.html" out.json 30
+node scripts/headless-test.mjs "http://localhost:8765/tests/score-test.html?set=huron&n=4" out.json 30
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 600 tests/drive-app.js shot
 node scripts/headless-test.mjs "http://127.0.0.1:8765/index.html" out.json 600 tests/drive-offline.js shot
 node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 tests/drive-library.js shot
@@ -68,6 +76,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 400 t
 node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" out.json 100
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-manual.js shot
 ```
 
 ## Deploy

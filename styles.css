@@ -123,6 +123,29 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .title-input:focus { border-color: var(--border); background: var(--surface); outline: none; }
 
+.segmented { display: flex; gap: 0; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; width: fit-content; }
+.segmented label { display: flex; align-items: center; gap: 6px; padding: 8px 16px; cursor: pointer; }
+.segmented label:has(input:checked) { background: var(--mine); font-weight: 600; }
+.segmented input { width: 16px; height: 16px; }
+.manual-help p { margin: 0 0 8px; font-size: 0.95rem; }
+.link { min-height: 0; padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; font-weight: 400; }
+select { min-height: 40px; font: inherit; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.staff-menu {
+  position: fixed;
+  z-index: 4;
+  display: grid;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+}
+.staff-menu[hidden] { display: none; }
+.staff-menu button { justify-content: flex-start; border: 0; background: none; min-height: 44px; }
+.staff-menu button.chosen::after { content: "\2713"; margin-left: auto; padding-left: 12px; color: var(--accent); }
+.photo-list .mark { fill: #e0902a; fill-opacity: 0.16; stroke: #e0902a; stroke-opacity: 0.6; stroke-width: 4; }
+.photo-list .mark-label { fill: #b86a12; font: 600 40px system-ui, sans-serif; }
 .lines { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .lines li {
   display: flex;

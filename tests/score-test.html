@@ -1,10 +1,18 @@
 <script type="module">
+// Builds a score from testdata/<set>_<i>.musicxml and summarises lines, sample
+// bars and systems. ?set=huron&n=4 (default) or ?set=angelus&n=6.
 import { parsePage, buildScore } from "../score.js";
+const q = new URLSearchParams(location.search);
+const set = q.get("set") || "huron", count = Number(q.get("n") || 4);
 const names = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
 const nn = (m) => names[m % 12] + (Math.floor(m / 12) - 1);
-const xmls = await Promise.all([0,1,2,3].map(i => fetch(`../testdata/huron_${i}.musicxml`).then(r => r.text())));
+const xmls = await Promise.all([...Array(count).keys()].map((i) => fetch(`../testdata/${set}_${i}.musicxml`).then((r) => r.text())));
 const s = buildScore(xmls.map(parsePage));
-const bar = (line, b) => { const m = s.measures[b-1]; return line.notes.filter(n => n.t >= m.start && n.t < m.start + m.length).map(n => nn(n.midi) + "/" + n.dur).join(" "); };
-const out = { measures: s.measures.length, length: s.length, lines: s.lines.map(l => ({ label: l.label, n: l.notes.length, bars: Object.fromEntries([1,2,7,13,23,26,30,45,65,85].map(b => [b, bar(l, b)])) })) };
-window.result = out;
+const bar = (line, b) => { const m = s.measures[b - 1]; return line.notes.filter((n) => n.t >= m.start && n.t < m.start + m.length).map((n) => nn(n.midi) + "/" + n.dur).join(" "); };
+window.result = {
+  measures: s.measures.length,
+  length: s.length,
+  lines: s.lines.map((l) => ({ id: l.id, label: l.label, staffKey: l.staffKey, voice: l.voice, n: l.notes.length, bars: Object.fromEntries([1, 2, 7, 13, 23, 26].map((b) => [b, bar(l, b)])) })),
+  systems: s.systems.map((y) => ({ page: y.page, bars: `${y.bars[0].number}-${y.bars.at(-1).number}`, staves: y.staves.map((st) => `${st.key}[${st.lines.join(",")}] y${Math.round(st.y0)}-${Math.round(st.y1)}`) })),
+};
 </script>

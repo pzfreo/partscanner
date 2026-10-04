@@ -36,6 +36,7 @@ function show(name, nav = "push") {
   $("back").hidden = name === "home";
   if (name !== "practice") {
     player?.stop();
+    closeStaffMenu();
     releasePhotos("practice");
     $("photo-list").replaceChildren();
     $("panel").hidden = true;
@@ -299,7 +300,7 @@ let current; // library entry
 let score;
 
 function openScore(entry, nav = "push") {
-  const partChosen = entry.mine != null; // read before defaults are filled in below
+  const partChosen = entry.mine != null || entry.mode != null; // read before defaults are filled in below
   current = entry;
   score = buildScore(entry.pages.map(parsePage));
   player?.stop();
@@ -309,6 +310,11 @@ function openScore(entry, nav = "push") {
     follow(beat);
   };
   player.onEnd = () => setPlaying(false);
+  player.mix = (lineId, t) => {
+    if (lineId === myLineAt(t)) return { gain: 1, shift: 12 * current.octave };
+    if (current.mode === "auto" && current.excluded.includes(lineId)) return { gain: 0 };
+    return { gain: othersGain, shift: 0 };
+  };
 
   $("title").value = entry.title;
   $("to-bar").value = score.measures.length;
@@ -319,7 +325,12 @@ function openScore(entry, nav = "push") {
   const soprano = score.lines.findIndex((l) => l.label === "Soprano");
   current.mine = Math.min(entry.mine ?? Math.max(0, soprano), score.lines.length - 1);
   current.excluded = entry.excluded ?? [];
+  current.mode = entry.mode ?? "auto";
+  current.manual = entry.manual ?? {};
+  current.octave = entry.octave ?? 0;
+  $("octave").value = String(current.octave);
   renderLines();
+  renderMode();
   applyMix();
   updateLabels();
   player.bpm = Number($("tempo").value);
@@ -364,16 +375,17 @@ function renderFollow() {
       img.src = photoUrl("practice", blob);
       const svg = document.createElementNS(SVG, "svg");
       svg.setAttribute("preserveAspectRatio", "none");
-      const view = { svg, bar: svgEl("rect", "bar"), playhead: svgEl("line", "playhead"), note: svgEl("circle", "note") };
-      svg.append(view.bar, view.playhead, view.note);
+      const view = { svg, marks: document.createElementNS(SVG, "g"), bar: svgEl("rect", "bar"), playhead: svgEl("line", "playhead"), note: svgEl("circle", "note") };
+      svg.append(view.marks, view.bar, view.playhead, view.note);
       img.onload = () => {
         const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
         view.w = img.naturalWidth * scale;
         view.h = img.naturalHeight * scale;
         svg.setAttribute("viewBox", `0 0 ${view.w} ${view.h}`);
         if (p === 0) showBar(barRange()[0]);
+        renderMarks();
       };
-      svg.onclick = (e) => pickBar(p, e);
+      svg.onclick = (e) => (current.mode === "manual" ? openStaffMenu(p, e) : pickBar(p, e));
       pageViews.push(view);
       div.append(img, svg);
       return div;
@@ -417,7 +429,8 @@ function follow(beat, playing = true) {
   const x = from.x + ((to.x - from.x) * (beat - from.t)) / Math.max(1e-6, to.t - from.t);
   showEl(view.playhead, { x1: x, x2: x, y1: r.y, y2: r.y + r.h });
 
-  const note = score.lines[current.mine].notes.find((n) => n.t <= beat + 1e-6 && beat < n.t + n.dur);
+  const mine = myLineAt(beat);
+  const note = mine != null && score.lines[mine].notes.find((n) => n.t <= beat + 1e-6 && beat < n.t + n.dur);
   if (note?.pos && note.pos.page === bar.page) {
     showEl(view.note, { cx: note.pos.x, cy: note.pos.y, r: view.w * 0.011 });
   } else hide(view.note);
@@ -438,12 +451,16 @@ function keepInView(el) {
   window.scrollBy({ top: r.top - top - Math.max(0, (bottom - top - r.height) / 3), behavior: "smooth" });
 }
 
-// Tap a bar on a photo to start from it.
-function pickBar(page, e) {
+// Tap position in the photo's coordinates.
+function tapPoint(page, e) {
   const view = pageViews[page];
   const rect = view.svg.getBoundingClientRect();
-  const x = ((e.clientX - rect.left) / rect.width) * view.w;
-  const y = ((e.clientY - rect.top) / rect.height) * view.h;
+  return { view, x: ((e.clientX - rect.left) / rect.width) * view.w, y: ((e.clientY - rect.top) / rect.height) * view.h };
+}
+
+// Tap a bar on a photo to start from it.
+function pickBar(page, e) {
+  const { view, x, y } = tapPoint(page, e);
   let best = null;
   let bestDist = Infinity;
   for (const bar of score.measures) {
@@ -459,6 +476,139 @@ function pickBar(page, e) {
   if (Number($("to-bar").value) < best.number) $("to-bar").value = score.measures.length;
   $("from-bar").onchange();
 }
+
+// ---------- your part: auto (one line) or manual (marked per system) ----------
+
+let othersGain = 0.25;
+
+function myLineAt(beat) {
+  if (current.mode === "auto") return current.mine;
+  return current.manual[barAt(beat).system] ?? null;
+}
+
+function renderMode() {
+  for (const r of document.querySelectorAll('input[name="mode"]')) r.checked = r.value === current.mode;
+  const manual = current.mode === "manual";
+  $("lines").hidden = manual;
+  $("manual-help").hidden = !manual;
+  $("tap-hint").textContent = manual
+    ? "Tap the staff you sing to mark it, in each system you want to learn."
+    : "Tap a bar to start from there.";
+  const marked = Object.keys(current.manual).length;
+  $("marked-count").textContent = `${marked} of ${score.systems.length} systems marked.`;
+  $("clear-marks").hidden = !marked;
+}
+
+for (const r of document.querySelectorAll('input[name="mode"]')) {
+  r.onchange = () => {
+    current.mode = r.value;
+    updateEntry(current.id, { mode: current.mode });
+    renderMode();
+    renderMarks();
+  };
+}
+$("clear-marks").onclick = () => setMarks({});
+$("octave").onchange = () => {
+  current.octave = Number($("octave").value);
+  updateEntry(current.id, { octave: current.octave });
+};
+
+function setMarks(manual) {
+  current.manual = manual;
+  updateEntry(current.id, { manual });
+  renderMode();
+  renderMarks();
+}
+
+// Tints the staff you've marked in each system (manual mode only).
+function renderMarks() {
+  for (const [p, view] of pageViews.entries()) {
+    view.marks.replaceChildren();
+    if (current.mode !== "manual" || !view.w) continue;
+    for (const [sysIndex, lineId] of Object.entries(current.manual)) {
+      const sys = score.systems[sysIndex];
+      const line = score.lines[lineId];
+      const staff = sys?.page === p && sys.staves.find((st) => st.key === line?.staffKey);
+      if (!staff) continue;
+      const px = view.w * 0.015;
+      const py = view.h * 0.012;
+      const rect = document.createElementNS(SVG, "rect");
+      rect.setAttribute("class", "mark");
+      rect.setAttribute("x", sys.box.x0 - px);
+      rect.setAttribute("y", staff.y0 - py);
+      rect.setAttribute("width", sys.box.x1 - sys.box.x0 + 2 * px);
+      rect.setAttribute("height", staff.y1 - staff.y0 + 2 * py);
+      rect.setAttribute("rx", view.w * 0.006);
+      view.marks.append(rect);
+      if (line.voice !== "only") {
+        const label = document.createElementNS(SVG, "text");
+        label.setAttribute("class", "mark-label");
+        label.setAttribute("x", sys.box.x1 + px - view.w * 0.005);
+        label.setAttribute("y", staff.y0 - py - view.h * 0.004);
+        label.setAttribute("text-anchor", "end");
+        label.textContent = line.voice === "upper" ? "upper voice" : "lower voice";
+        view.marks.append(label);
+      }
+    }
+  }
+}
+
+// Manual mode: tap a staff to choose which voice on it is yours in that system.
+function openStaffMenu(page, e) {
+  const { view, y } = tapPoint(page, e);
+  const gap = (box0, box1) => Math.max(box0 - y, 0, y - box1);
+  const sys = score.systems
+    .filter((s) => s.page === page && s.box && s.staves.length)
+    .sort((a, b) => gap(a.box.y0 - view.h * 0.03, a.box.y1 + view.h * 0.03) - gap(b.box.y0 - view.h * 0.03, b.box.y1 + view.h * 0.03))[0];
+  if (!sys) return pickBar(page, e);
+  const staff = sys.staves.slice().sort((a, b) => gap(a.y0, a.y1) - gap(b.y0, b.y1))[0];
+  const order = { upper: 0, only: 1, lower: 2 };
+  const choices = staff.lines.map((id) => score.lines[id]).sort((a, b) => order[a.voice] - order[b.voice]);
+  const chosen = current.manual[sys.index];
+  const menu = $("staff-menu");
+  const item = (text, action, isChosen = false) => {
+    const b = document.createElement("button");
+    b.textContent = text;
+    b.setAttribute("role", "menuitem");
+    if (isChosen) b.className = "chosen";
+    b.onclick = () => {
+      closeStaffMenu();
+      action();
+    };
+    return b;
+  };
+  menu.replaceChildren(
+    ...choices.map((line) =>
+      item(
+        { upper: "Upper voice", lower: "Lower voice", only: "My part" }[line.voice],
+        () => setMarks({ ...current.manual, [sys.index]: line.id }),
+        line.id === chosen,
+      ),
+    ),
+    ...(chosen != null
+      ? [item("Not mine", () => {
+          const { [sys.index]: _, ...rest } = current.manual;
+          setMarks(rest);
+        })]
+      : []),
+    item("Play from here", () => pickBar(page, e)),
+  );
+  menu.hidden = false;
+  const w = menu.offsetWidth;
+  const h = menu.offsetHeight;
+  menu.style.left = `${Math.min(Math.max(8, e.clientX - w / 2), window.innerWidth - w - 8)}px`;
+  menu.style.top = `${Math.min(Math.max(8, e.clientY + 12), window.innerHeight - h - 90)}px`;
+  setTimeout(() => document.addEventListener("pointerdown", outsideMenu), 0);
+}
+
+function outsideMenu(e) {
+  if (!$("staff-menu").contains(e.target)) closeStaffMenu();
+}
+function closeStaffMenu() {
+  $("staff-menu").hidden = true;
+  document.removeEventListener("pointerdown", outsideMenu);
+}
+window.addEventListener("scroll", closeStaffMenu, { passive: true });
 
 function barAt(beat) {
   let lo = 0;
@@ -504,12 +654,9 @@ function renderLines() {
   );
 }
 
+// Takes effect from the next notes scheduled (within a quarter second).
 function applyMix() {
-  const others = Number($("others").value) / 100;
-  for (const line of score.lines) {
-    const gain = current.excluded.includes(line.id) ? 0 : line.id === current.mine ? 1 : others;
-    player.setGain(line.id, gain);
-  }
+  othersGain = Number($("others").value) / 100;
 }
 
 function updateLabels() {
