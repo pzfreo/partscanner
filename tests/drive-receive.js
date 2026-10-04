@@ -33,26 +33,36 @@ await waitFor(() => !popup.document.getElementById("practice").hidden, 10000, "s
 r.popupOpenedScore = popup.document.getElementById("title").value;
 popup.close();
 
-// 2. The plain link alone (as if the viewer blocked the script).
-const g = document.createElement("iframe");
-g.src = link.href;
-document.body.append(g);
-await waitFor(() => g.contentDocument?.getElementById("import-offer") && !g.contentDocument.getElementById("import-offer").hidden, 20000, "offer from link");
-r.linkOffer = g.contentDocument.getElementById("import-question").textContent;
+// 2. The plain link alone (as if the viewer blocked the script, or the
+// installed app caught it): the score has photos, which a link can't carry,
+// so the app explains instead of adding a copy without them.
+const before = (await scores()).length;
+const shown = async (src, label) => {
+  const g = document.createElement("iframe");
+  g.src = src;
+  document.body.append(g);
+  await waitFor(() => g.contentDocument?.getElementById("import-offer") && !g.contentDocument.getElementById("import-offer").hidden, 20000, label);
+  return g;
+};
+let g = await shown(link.href, "notice from link");
+r.linkNotice = { text: g.contentDocument.getElementById("import-question").textContent, addHidden: g.contentDocument.getElementById("import-yes").hidden, button: g.contentDocument.getElementById("import-no").textContent };
+// 3. The same with &receive (the app button's link, no way back to the page).
+const h = await shown(link.href + "&receive", "notice without opener");
+r.noOpenerNotice = h.contentDocument.getElementById("import-question").textContent.slice(0, 40);
+r.nothingAdded = (await scores()).length === before;
+// A score with no photos comes through the link whole: offered and added.
+const plain = await scoreFile({ id: "plain", title: "No photos", created: 4, pages, images: [], octave: -1 });
+const pf = document.createElement("iframe");
+pf.src = URL.createObjectURL(plain);
+document.body.append(pf);
+const plainLink = await waitFor(() => pf.contentDocument?.getElementById("open")?.href, 10000, "plain file page");
+g = await shown(plainLink, "offer for photo-less score");
+r.plainOffer = g.contentDocument.getElementById("import-question").textContent;
 g.contentDocument.getElementById("import-yes").click();
 await waitFor(() => !g.contentDocument.getElementById("practice").hidden, 10000, "link import opened");
-const all = await scores();
-const copy = all.find((e) => e.title === "Huron (sent) (2)");
-r.viaLink = { images: copy.images.length, pages: copy.pages.length, manual: copy.manual, octave: copy.octave, newId: copy.id !== "sent" };
-r.originalUntouched = all.find((e) => e.id === "sent").images.length === 2;
+const copy = (await scores()).find((e) => e.title === "No photos");
+r.viaLink = { images: copy.images.length, pages: copy.pages.length, octave: copy.octave };
 r.linkOpensAsRead = !g.contentDocument.getElementById("read-view").hidden;
-// 3. The button's link where the app can't reach back to the file's page
-// (as when an installed app catches it): falls back to the link's score.
-const h = document.createElement("iframe");
-h.src = link.href + "&receive";
-document.body.append(h);
-await waitFor(() => h.contentDocument?.getElementById("import-offer") && !h.contentDocument.getElementById("import-offer").hidden, 20000, "offer without opener");
-r.noOpenerOffer = h.contentDocument.getElementById("import-question").textContent;
 // An older file's bare #receive with no opener says what to do.
 const k = document.createElement("iframe");
 k.src = "/index.html#receive";

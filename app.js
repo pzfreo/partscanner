@@ -834,7 +834,22 @@ async function receiveFromPage() {
   } catch (e) {
     showError(`Couldn't open the shared score: ${e.message}`);
   }
-  if (entry) offerImport(entry);
+  if (entry?.photosLeftOut) {
+    // Only the music came through the link (the installed app can't reach the
+    // file's page): don't add a copy without its photos.
+    showNotice(
+      `“${entry.title}” has photos of its pages, which can't come across this way. ` +
+        "Go back to the file and tap “Open in the Partsong app”, then choose Partsong.",
+    );
+  } else if (entry) offerImport(entry);
+}
+
+function showNotice(text) {
+  $("import-question").textContent = text;
+  $("import-yes").hidden = true;
+  $("import-no").textContent = "OK";
+  $("import-no").onclick = () => ($("import-offer").hidden = true);
+  $("import-offer").hidden = false;
 }
 
 // The full score (with photos) posted by the .partsong.html page that opened us.
@@ -856,9 +871,10 @@ function fromOpener() {
 // done() runs once the question is answered either way.
 async function offerImport(entry, done = () => {}) {
   await asNewScore(entry);
-  let pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
-  if (!entry.images.length) pages += ", without the page photos";
+  const pages = `${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}`;
   $("import-question").textContent = `Add “${entry.title}” (${pages}) to your scores?`;
+  $("import-yes").hidden = false;
+  $("import-no").textContent = "Cancel";
   $("import-offer").hidden = false;
   $("import-yes").onclick = async () => {
     $("import-offer").hidden = true;

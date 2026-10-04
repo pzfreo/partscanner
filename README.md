@@ -48,12 +48,16 @@ then *Add to Home screen*.
   share a few file types, hence HTML; opened elsewhere it's a page linking to the
   app. *Open file* imports it. Imports never overwrite: if the score or its name is
   already in the library, it's added as "Title (2)" etc. Opened in a
-  browser (tapping it in WhatsApp/email), the file shows *Open in Partsong*: it
-  opens the app and posts the full score to it (`#receive`); without script the
-  button is a link carrying the score minus photos (`#import=…`, gzipped). The
-  app always asks before adding. The installed
+  browser (tapping it in WhatsApp/email), the file shows *Open in Partsong on
+  the web*: a link carrying the score minus photos (`#import=…&receive`,
+  gzipped), and the app then asks the page for the full score. An installed app
+  caught by that link can't reach the page, so on Android the file leads with
+  *Open in the Partsong app*, which hands the file to the share sheet. A score
+  with photos is never added from the link alone: the app says to use the app
+  button instead. The app always asks before adding. The installed
   app is also a share target (manifest `share_target` → service worker inbox):
-  shared score files open, shared PDFs/photos start a new scan.
+  shared score files are offered (and wait in the inbox until answered, since
+  Android can launch the app twice), shared PDFs/photos start a new scan.
 - **Delete** (bin icon on each library row, or in a score's settings) asks to
   confirm; locked scores can't be deleted.
 - **Make a copy** (copy icon on each library row): duplicates a score with its photos, marks and

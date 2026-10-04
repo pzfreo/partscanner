@@ -32,9 +32,10 @@ async function asJpeg(blob) {
 }
 
 // The score without photos, gzipped into a URL-safe string: small enough for a
-// link (#import=...) that works even where the page's script can't run.
+// link (#import=...) that works even where the page's script can't run. It
+// says how many photos were left out, so the app can refuse a partial copy.
 async function linkPayload(doc) {
-  const json = JSON.stringify({ ...doc, images: [] });
+  const json = JSON.stringify({ ...doc, images: [], photos: doc.images.length });
   const gz = new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("gzip")));
   return (await toBase64(await gz.blob())).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }
@@ -42,7 +43,9 @@ async function linkPayload(doc) {
 export async function entryFromLink(payload) {
   const gz = fromBase64(payload.replaceAll("-", "+").replaceAll("_", "/"), "application/gzip");
   const json = await new Response(gz.stream().pipeThrough(new DecompressionStream("gzip"))).text();
-  return parseScoreFile(json);
+  const entry = parseScoreFile(json);
+  if (entry) entry.photosLeftOut = JSON.parse(json).photos || 0;
+  return entry;
 }
 
 export async function scoreFile(entry) {
