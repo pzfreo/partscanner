@@ -79,8 +79,7 @@ a{color:#2b2870}
 <h1>${escapeHtml(entry.title)}</h1>
 <p>A <strong>Partsong</strong> score (${pages}) for learning your part.</p>
 <a id="open" class="open" href="${app}#import=${await linkPayload(doc)}">Open in Partsong</a>
-<p class="small">Partsong opens and asks to add the score to your library. If the photos of the pages don't come across,
-save this file and use <em>Open file</em> in <a href="${app}">${app.replace(/^https?:\/\//, "")}</a>.</p>
+<p class="small">Partsong (<a href="${app}">${app.replace(/^https?:\/\//, "")}</a>) opens and asks to add the score to your library.</p>
 <script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
 <script>
 document.getElementById("open").addEventListener("click", (e) => {

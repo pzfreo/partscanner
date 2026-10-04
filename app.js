@@ -824,7 +824,7 @@ async function receiveFromPage() {
   try {
     const [, payload, receive] = hash.match(/^#import=([\w-]+)(&receive)?/) ?? [];
     // Files from before the link carried the score: nothing to fall back on.
-    if (hash === "#receive" && !window.opener) throw new Error("save the file, then use Open file");
+    if (hash === "#receive" && !window.opener) throw new Error("it was sent from an older version of Partsong. Ask for it to be shared again");
     if ((receive || hash === "#receive") && window.opener) {
       const json = await fromOpener().catch(() => null);
       if (json) entry = parseScoreFile(json);
