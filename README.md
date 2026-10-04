@@ -58,6 +58,11 @@ then *Add to Home screen*.
   confirm; locked scores can't be deleted.
 - **Make a copy** (copy icon on each library row): duplicates a score with its photos, marks and
   settings, e.g. to mark first and second sopranos as separate scores.
+- **Report a problem** (home screen and score settings): emails
+  bugs@partsong.app (forwarded via Namecheap) with the description plus the app
+  version, device, current score/bar/part settings, recent errors and the
+  reader's recent log, all shown to the user first; *Copy report* if there's no
+  mail app.
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
@@ -122,6 +127,7 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 te
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-panel.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-copy.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-delete.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-report.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot
 python3 scripts/flaky-server.py 8768 --flaky &   # breaks every 3rd model response
 node scripts/headless-test.mjs "http://localhost:8768/tests/omr-test.html?page=huron_1.png" out.json 380

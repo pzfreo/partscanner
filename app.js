@@ -9,7 +9,16 @@ const $ = (id) => document.getElementById(id);
 
 // Unexpected errors show briefly on screen, so a problem on the phone can be
 // screenshotted rather than just looking like a freeze.
+// Recent errors and reader log lines, for bug reports.
+const recentErrors = [];
+const readerLog = [];
+const remember = (list, item, max) => {
+  list.push(`${new Date().toISOString().slice(11, 19)} ${item}`);
+  if (list.length > max) list.shift();
+};
+
 function showError(message) {
+  remember(recentErrors, message, 10);
   const el = $("error-toast");
   el.textContent = `Something went wrong: ${message}`;
   el.hidden = false;
@@ -69,11 +78,84 @@ function goHome() {
 $("back").onclick = goHome;
 
 window.addEventListener("popstate", (e) => {
+  if (!$("report").hidden && !e.state?.report) return closeReport(false);
   if (e.state?.screen === "practice" && !$("practice").hidden) {
     setPanel(false, false);
     endMarkup(false);
   } else show("home", "none");
 });
+
+// ---------- bug reports (emailed to bugs@partsong.app) ----------
+
+const REPORT_TO = "bugs@partsong.app";
+const VERSION = new URL(import.meta.url).searchParams.get("v") || "dev";
+
+function diagnostics() {
+  const screen = ["home", "scan", "practice"].find((s) => !$(s).hidden) || "?";
+  const lines = [
+    `Partsong ${VERSION} · ${location.host}`,
+    `Device: ${navigator.userAgent}`,
+    `Screen: ${innerWidth}×${innerHeight} @${devicePixelRatio}x` +
+      (navigator.deviceMemory ? ` · ${navigator.deviceMemory} GB RAM` : "") +
+      ` · ${navigator.onLine ? "online" : "offline"}`,
+    `On: ${screen}`,
+  ];
+  if (screen === "practice" && current && score) {
+    const marks = Object.keys(current.manual ?? {}).length;
+    lines.push(
+      `Score: "${current.title}" · ${current.pages.length} pages · ${current.images?.length ?? 0} photos · ${score.measures.length} bars`,
+      `Position: ${$("position").textContent} · from bar ${$("from-bar").value} to ${$("to-bar").value}`,
+      `Part: ${marks ? `${marks} of ${score.systems.length} systems marked` : score.lines[current.mine]?.label ?? "?"}` +
+        ` · pitch ${current.octave} · tempo ${$("tempo").value} · others ${$("others").value}%` +
+        ` · view ${$("read-view").hidden ? "pages" : "as read"}`,
+      `Parts: ${score.lines.map((l) => l.label).join(", ")}`,
+    );
+  }
+  if (screen === "scan") lines.push(`Scan: ${pages.length} pages · status: ${$("status").textContent.replace(/\n/g, " | ")}`);
+  if (recentErrors.length) lines.push("", "Recent errors:", ...recentErrors);
+  if (readerLog.length) lines.push("", "Music reader log:", ...readerLog.slice(-25));
+  return lines.join("\n");
+}
+
+function openReport() {
+  $("report-diag").textContent = diagnostics();
+  $("report-status").textContent = `Opens your email app, addressed to ${REPORT_TO}.`;
+  $("report").hidden = false;
+  history.pushState({ ...history.state, report: true }, "");
+  $("report-text").focus();
+}
+for (const b of document.querySelectorAll(".report-open")) b.onclick = openReport;
+
+function closeReport(nav = true) {
+  $("report").hidden = true;
+  if (nav && history.state?.report) history.back();
+}
+$("report-close").onclick = () => closeReport();
+
+function reportText() {
+  return `${$("report-text").value.trim() || "(no description)"}\n\n---\n${$("report-diag").textContent}`;
+}
+
+$("report-send").onclick = () => {
+  const what = $("report-text").value.trim().split("\n")[0].slice(0, 60);
+  const subject = `Partsong problem${what ? `: ${what}` : ""}`;
+  // Long bodies can break the hand-off to the mail app; trim if needed.
+  let body = reportText();
+  if (body.length > 6000) body = body.slice(0, 6000) + "\n…(trimmed)";
+  const url = `mailto:${REPORT_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  $("report-send").dataset.href = url; // what was handed to the mail app (also used by tests)
+  location.href = url;
+  $("report-status").textContent = `If no email app opened, use Copy report and send it to ${REPORT_TO}.`;
+};
+
+$("report-copy").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(`To: ${REPORT_TO}\n\n${reportText()}`);
+    $("report-status").textContent = `Copied. Paste it into an email to ${REPORT_TO}.`;
+  } catch {
+    $("report-status").textContent = "Couldn't copy here. Long-press the technical details to copy them.";
+  }
+};
 
 const DELETE_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
@@ -187,6 +269,7 @@ function startWorker() {
         resolve();
       } else if (data.type === "log") {
         console.log("[omr]", data.msg);
+        remember(readerLog, String(data.msg).slice(0, 200), 40);
         const m = /Running TrOmr inference on staff image (\d+)/.exec(data.msg);
         if (m) setPageStatus(`reading staff ${Number(m[1]) + 1}`);
         else if (/Found \d+ connected staffs/.test(data.msg)) setPageStatus("found the staves");
