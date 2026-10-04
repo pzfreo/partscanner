@@ -70,7 +70,8 @@ then *Add to Home screen*.
   file (share sheet on phones, with the address copied to paste in; download +
   email on desktop).
 - **Install and updates**: an install card on the home screen uses the browser's
-  install prompt (Chrome/Edge) or shows Add to Home Screen steps (iPhone); "Not
+  install prompt (Chrome/Edge); not offered on iPhone, where a home-screen app
+  keeps a library apart from Safari's, which shared files open in; "Not
   now" snoozes it for a month. Installed apps rarely restart, so the app checks
   for a newer deploy (the version stamped into index.html) when it comes back to
   the screen and every 30 minutes, and offers an Update banner.

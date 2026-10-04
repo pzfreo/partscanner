@@ -267,20 +267,19 @@ const snoozed = () => {
   }
 };
 let installPrompt = null;
-function showInstallCard(ios) {
+function showInstallCard() {
   if (installed() || snoozed()) return;
-  $("install-ios").hidden = !ios;
-  $("install-now").hidden = ios;
   $("install-card").hidden = false;
 }
 // Chrome/Edge (Android, desktop): use the browser's own install prompt.
 addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   installPrompt = e;
-  showInstallCard(false);
+  showInstallCard();
 });
-// iPhone/iPad Safari has no prompt: show the steps instead.
-if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !installed()) showInstallCard(true);
+// Not suggested on iPhone/iPad: a home-screen app there keeps a library
+// separate from Safari's, so scores opened from shared files (which open in
+// Safari) wouldn't show up in it.
 $("install-now").onclick = async () => {
   if (!installPrompt) return;
   installPrompt.prompt();
