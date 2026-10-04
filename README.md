@@ -126,7 +126,8 @@ node scripts/headless-test.mjs "http://localhost:8765/testdata/" out.json 400 te
 
 `.github/workflows/pages.yml` fetches homr and the models and publishes to
 GitHub Pages (custom domain `partsong.app`, set in the repo's Pages settings) on
-every push to `main` (models aren't committed; GitHub release
+every push to `main`. `scripts/stamp-version.mjs` adds `?v=<commit>` to the app's
+CSS/JS references so a deploy is never mixed with cached files from the last one (models aren't committed; GitHub release
 downloads don't allow cross-origin fetches, so they're served with the site).
 
 ## Limits
