@@ -15,6 +15,7 @@ export class Player {
   constructor(score) {
     this.score = score;
     this.bpm = 80;
+    this.instrument = "piano";
     this.mix = () => ({ gain: 1, shift: 0 });
     this.ctx = null;
     this.playing = false;
@@ -111,25 +112,60 @@ export class Player {
     }
   }
 
+  // Three built-in sounds, synthesised (no sample downloads):
+  // piano (struck, fading), organ (steady) and voice (a soft "oo" with vibrato).
   note(midi, gain, when, duration) {
     const ctx = this.ctx;
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.value = midiToHz(midi);
-    const env = ctx.createGain();
+    const hz = midiToHz(midi);
     const end = when + Math.max(0.05, duration - 0.03);
+    const osc = ctx.createOscillator();
+    osc.frequency.value = hz;
+    const env = ctx.createGain();
+    const sources = [osc];
+    let out = osc;
     env.gain.setValueAtTime(0, when);
-    env.gain.linearRampToValueAtTime(0.25 * gain, when + 0.015);
-    env.gain.setTargetAtTime(0.18 * gain, when + 0.015, 0.1);
-    env.gain.setTargetAtTime(0, end, 0.02);
-    osc.connect(env).connect(this.master);
+    if (this.instrument === "organ") {
+      osc.setPeriodicWave(this.wave("organ", [0, 1, 0.55, 0.3, 0.18, 0.08, 0.05]));
+      env.gain.linearRampToValueAtTime(0.16 * gain, when + 0.03);
+    } else if (this.instrument === "voice") {
+      osc.type = "sawtooth";
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = Math.min(1100, hz * 2.5);
+      filter.Q.value = 1.5;
+      // Vibrato that eases in after the start of the note, as singers do.
+      const lfo = ctx.createOscillator();
+      const depth = ctx.createGain();
+      lfo.frequency.value = 5.5;
+      depth.gain.setValueAtTime(0, when);
+      depth.gain.linearRampToValueAtTime(hz * 0.006, when + 0.4);
+      lfo.connect(depth).connect(osc.frequency);
+      lfo.start(when);
+      lfo.stop(end + 0.3);
+      sources.push(lfo);
+      out = osc.connect(filter);
+      env.gain.linearRampToValueAtTime(0.3 * gain, when + 0.08);
+    } else {
+      osc.setPeriodicWave(this.wave("piano", [0, 1, 0.45, 0.2, 0.12, 0.05]));
+      env.gain.linearRampToValueAtTime(0.3 * gain, when + 0.008);
+      env.gain.setTargetAtTime(0.06 * gain, when + 0.008, 0.35);
+    }
+    env.gain.setTargetAtTime(0, end, this.instrument === "piano" ? 0.05 : 0.04);
+    out.connect(env).connect(this.master);
     osc.start(when);
-    osc.stop(end + 0.15);
+    osc.stop(end + 0.3);
     this.active ??= [];
-    this.active.push(osc);
+    this.active.push(...sources);
     osc.onended = () => {
-      const i = this.active.indexOf(osc);
-      if (i >= 0) this.active.splice(i, 1);
+      for (const s of sources) {
+        const i = this.active.indexOf(s);
+        if (i >= 0) this.active.splice(i, 1);
+      }
     };
+  }
+
+  wave(name, harmonics) {
+    this.waves ??= {};
+    return (this.waves[name] ??= this.ctx.createPeriodicWave(new Float32Array(harmonics.length), new Float32Array(harmonics)));
   }
 }

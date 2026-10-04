@@ -80,7 +80,9 @@ then *Add to Home screen*.
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
-  the app at scheduling time; tempo, bar range, loop.
+  the app at scheduling time; tempo, bar range, loop. Three synthesised sounds
+  (*Sound*: piano, organ, voice), remembered per device;
+  `tests/drive-instrument.js` renders each offline and returns them as WAV.
 - **Follow along**: homr records where each note sits in the photo
   (`<!-- imgpos -->` comments), so playback highlights the current bar on your
   own pages, with a playhead and a marker on your part's note, and auto-scrolls.

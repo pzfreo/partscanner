@@ -115,7 +115,7 @@ function diagnostics() {
       `Score: "${current.title}" · ${plural(current.pages.length, "page")} · ${plural(current.images?.length ?? 0, "photo")} · ${plural(score.measures.length, "bar")}`,
       `Position: ${$("position").textContent} · from bar ${$("from-bar").value} to ${$("to-bar").value}`,
       `Part: ${marks ? `${marks} of ${score.systems.length} systems marked` : score.lines[current.mine]?.label ?? "?"}` +
-        ` · pitch ${current.octave} · tempo ${$("tempo").value} · others ${$("others").value}%` +
+        ` · pitch ${current.octave} · sound ${$("instrument").value} · tempo ${$("tempo").value} · others ${$("others").value}%` +
         ` · view ${$("read-view").hidden ? "pages" : "as read"}`,
       `Parts: ${score.lines.map((l) => l.label).join(", ")}`,
     );
@@ -876,6 +876,7 @@ function openScore(entry, nav = "push") {
   applyMix();
   updateLabels();
   player.bpm = Number($("tempo").value);
+  player.instrument = $("instrument").value;
   $("position").textContent = "Bar 1";
   setPlaying(false);
   resumeAt = null;
@@ -1062,6 +1063,19 @@ function renderPartChoice() {
   $("marked-count").textContent = `${marked} of ${score.systems.length} systems`;
   $("tap-hint").textContent = marking ? "Tap the staff you sing in each system." : "Tap a bar to start from there.";
 }
+
+// The sound is a preference for this device, not part of a score.
+const INSTRUMENT_KEY = "partsong-instrument";
+try {
+  const saved = localStorage.getItem(INSTRUMENT_KEY);
+  if ([...$("instrument").options].some((o) => o.value === saved)) $("instrument").value = saved;
+} catch {}
+$("instrument").onchange = () => {
+  if (player) player.instrument = $("instrument").value;
+  try {
+    localStorage.setItem(INSTRUMENT_KEY, $("instrument").value);
+  } catch {}
+};
 
 $("octave").onchange = () => {
   current.octave = Number($("octave").value);
