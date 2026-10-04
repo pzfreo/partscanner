@@ -1,7 +1,8 @@
 // Score files for sharing between devices or people (WhatsApp, Drive, email):
 // an .html file (one of the few types browsers will hand to the share sheet)
 // carrying the recognised MusicXML, page photos and practice settings as JSON.
-// Opened anywhere else, it shows a note pointing to Part Scanner.
+// Opened anywhere else, it shows a note pointing to Partsong. (Internal ids
+// keep the app's original name, Part Scanner, so older files still open.)
 
 const FORMAT = "partscanner-score";
 const SETTINGS = ["mine", "excluded", "manual", "octave", "tempo", "others", "locked"];
@@ -47,17 +48,17 @@ export async function scoreFile(entry) {
   const app = new URL("./", location.href).href;
   const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(entry.title)} – Part Scanner score</title>
+<title>${escapeHtml(entry.title)} – Partsong score</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:36em;margin:2em auto;padding:0 16px;color:#1d1d1b}a{color:#1f4e5f}</style>
 </head><body>
 <h1>${escapeHtml(entry.title)}</h1>
-<p>This is a <strong>Part Scanner</strong> score (${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}).
+<p>This is a <strong>Partsong</strong> score (${entry.pages.length} page${entry.pages.length === 1 ? "" : "s"}).
 To practise with it, open <a href="${app}">${app.replace(/^https?:\/\//, "")}</a> and use <em>Open file</em>,
-or share this file to the Part Scanner app.</p>
+or share this file to the Partsong app.</p>
 <script type="application/json" id="${FORMAT}">${JSON.stringify(doc).replaceAll("</", "<\\/")}</script>
 </body></html>
 `;
-  return new File([html], `${title}.partscore.html`, { type: "text/html" });
+  return new File([html], `${title}.partsong.html`, { type: "text/html" });
 }
 
 function escapeHtml(s) {

@@ -1,6 +1,6 @@
 {
-  "name": "Part Scanner",
-  "short_name": "Parts",
+  "name": "Partsong",
+  "short_name": "Partsong",
   "description": "Scan choral sheet music and play your own part.",
   "start_url": "./",
   "scope": "./",

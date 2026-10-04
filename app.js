@@ -365,7 +365,7 @@ $("open-xml").onchange = async (e) => {
   if (files.length) openFiles(files);
 };
 
-// Score files (shared from Part Scanner) and MusicXML, from the picker or the
+// Score files (shared from Partsong) and MusicXML, from the picker or the
 // share sheet.
 async function openFiles(files) {
   try {

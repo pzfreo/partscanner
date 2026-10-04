@@ -1,4 +1,4 @@
-# Part Scanner
+# Partsong
 
 A PWA for learning a choral part: photograph each page of a score, and the phone
 reads the music, splits it into parts (Soprano/Alto/Tenor/Bass, plus e.g. a solo
@@ -6,7 +6,7 @@ line), and plays it back with your part loud and the others quiet.
 
 Everything runs on the phone. There is no server.
 
-**Use it:** https://pzfreo.github.io/partscanner/ — open in Chrome on Android,
+**Use it:** https://partsong.app/ — open in Chrome on Android,
 then *Add to Home screen*.
 
 ## How it works
@@ -36,7 +36,7 @@ then *Add to Home screen*.
   with OpenSheetMusicDisplay (to spot recognition errors). Both follow along
   (bar highlight + playhead; the note marker and marking are on Pages) and take
   a tap on a bar as the start. Imported MusicXML opens on As read.
-- **Sharing** (`share.js`): *Share this score* makes one `.partscore.html` file
+- **Sharing** (`share.js`): *Share this score* makes one `.partsong.html` file
   (recognised MusicXML, photos re-encoded as JPEG, settings and marks) and hands
   it to the share sheet (WhatsApp, Drive, email) or downloads it. Browsers only
   share a few file types, hence HTML; opened elsewhere it's a page linking to the

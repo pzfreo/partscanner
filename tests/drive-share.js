@@ -21,11 +21,11 @@ $("share").click();
 await waitFor(() => shared, 60000, "share");
 r.file = { name: shared.name, type: shared.type, mb: +(shared.size / 1e6).toFixed(1) };
 r.status = await waitFor(() => $("share-status").textContent, 5000, "status");
-// Opened outside the app it's a readable page pointing to Part Scanner.
+// Opened outside the app it's a readable page pointing to Partsong.
 const f = document.createElement("iframe");
 f.src = URL.createObjectURL(shared);
 document.body.append(f);
-await waitFor(() => f.contentDocument?.body?.textContent.includes("Part Scanner"), 10000, "html page");
+await waitFor(() => f.contentDocument?.body?.textContent.includes("Partsong"), 10000, "html page");
 r.asPage = { heading: f.contentDocument.querySelector("h1").textContent, link: f.contentDocument.querySelector("a").href, text: f.contentDocument.querySelector("p").textContent.replace(/\s+/g, " ").slice(0, 60) };
 f.remove();
 
