@@ -91,6 +91,8 @@ window.addEventListener("popstate", (e) => {
 const REPORT_TO = "bugs@partsong.app";
 const VERSION = new URL(import.meta.url).searchParams.get("v") || "dev";
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
 function diagnostics() {
   const screen = ["home", "scan", "practice"].find((s) => !$(s).hidden) || "?";
   const lines = [
@@ -104,7 +106,7 @@ function diagnostics() {
   if (screen === "practice" && current && score) {
     const marks = Object.keys(current.manual ?? {}).length;
     lines.push(
-      `Score: "${current.title}" · ${current.pages.length} pages · ${current.images?.length ?? 0} photos · ${score.measures.length} bars`,
+      `Score: "${current.title}" · ${plural(current.pages.length, "page")} · ${plural(current.images?.length ?? 0, "photo")} · ${plural(score.measures.length, "bar")}`,
       `Position: ${$("position").textContent} · from bar ${$("from-bar").value} to ${$("to-bar").value}`,
       `Part: ${marks ? `${marks} of ${score.systems.length} systems marked` : score.lines[current.mine]?.label ?? "?"}` +
         ` · pitch ${current.octave} · tempo ${$("tempo").value} · others ${$("others").value}%` +
