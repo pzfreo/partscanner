@@ -1763,9 +1763,10 @@ if (/^#(receive|import=)/.test(location.hash)) {
   renderLibrary().then(receiveFromPage);
 } else if (new URLSearchParams(location.search).has("inbox")) {
   const stored = new URLSearchParams(location.search).get("inbox");
+  const fields = new URLSearchParams(location.search).get("fields");
   history.replaceState(null, "", location.pathname);
   renderLibrary()
-    .then(() => openInbox(`launched by share, ${stored || "?"} file(s) stored`))
+    .then(() => openInbox(`launched by share [${fields || "?"}], ${stored || "?"} stored`))
     .catch((e) => showError(`Couldn't open the shared file: ${e.message}`));
 } else {
   // A share whose launch never finished (e.g. stuck offline) is still waiting.

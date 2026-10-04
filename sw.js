@@ -49,11 +49,23 @@ self.addEventListener("fetch", (e) => {
           const headers = { "content-type": f.type, "x-name": encodeURIComponent(f.name) };
           await cache.put(`inbox/${Date.now()}-${i++}`, new Response(f, { headers }));
         }
+        // A score can come as shared text rather than a file: keep long text too.
+        for (const key of ["text", "title"]) {
+          const t = form.get(key);
+          if (typeof t === "string" && t.length > 1000) {
+            const headers = { "content-type": "text/html", "x-name": "shared.partsong.html" };
+            await cache.put(`inbox/${Date.now()}-${i++}`, new Response(t, { headers }));
+          }
+        }
+        // TEMPORARY share check: every field received, name:type:size.
+        const fields = [...form.entries()]
+          .map(([k, v]) => (typeof v === "string" ? `${k}:text:${v.length}` : `${k}:${v.type || "?"}:${v.size}`))
+          .join(",");
         // Android can launch the app twice for one share, and the page may
         // already have looked in the inbox: tell open pages it has changed.
         for (const c of await self.clients.matchAll({ type: "window" })) c.postMessage({ type: "inbox" });
         // ?inbox=<files stored> (the count is for the temporary share check).
-        return Response.redirect(new URL(`./?inbox=${i}`, self.registration.scope).href, 303);
+        return Response.redirect(new URL(`./?inbox=${i}&fields=${encodeURIComponent(fields || "none")}`, self.registration.scope).href, 303);
       })(),
     );
     return;
