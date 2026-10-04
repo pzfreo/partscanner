@@ -65,6 +65,11 @@ then *Add to Home screen*.
   mail app. With a score open, *Share report with score* also attaches the score
   file (share sheet on phones, with the address copied to paste in; download +
   email on desktop).
+- **Install and updates**: an install card on the home screen uses the browser's
+  install prompt (Chrome/Edge) or shows Add to Home Screen steps (iPhone); "Not
+  now" snoozes it for a month. Installed apps rarely restart, so the app checks
+  for a newer deploy (the version stamped into index.html) when it comes back to
+  the screen and every 30 minutes, and offers an Update banner.
 - **Lock**: a locked score can't have its part, title or existence changed
   (tempo, mix and bar range still work).
 - **Playback** (`player.js`): Web Audio; each note's volume and octave come from
@@ -131,6 +136,8 @@ node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 te
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-delete.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 60 tests/drive-report.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 40 tests/drive-about.js shot
+# update banner + install card: stamped build on :8770, see the test header
+SITE=<site-dir> node scripts/headless-test.mjs "http://localhost:8770/testdata/" out.json 180 tests/drive-update.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-stale.js shot
 python3 scripts/flaky-server.py 8768 --flaky &   # breaks every 3rd model response
 node scripts/headless-test.mjs "http://localhost:8768/tests/omr-test.html?page=huron_1.png" out.json 380

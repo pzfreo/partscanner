@@ -233,6 +233,68 @@ $("report-share").onclick = async () => {
   }
 };
 
+// ---------- updates: tell people (installed apps rarely restart) ----------
+
+// A deploy stamps its version into index.html (scripts/stamp-version.mjs).
+// When the app comes back to the screen, or every 30 minutes, fetch the page
+// fresh and compare; if it's newer, offer a reload rather than forcing one.
+let lastUpdateCheck = 0;
+async function checkForUpdate() {
+  if (VERSION === "dev" || !navigator.onLine || Date.now() - lastUpdateCheck < 60000) return;
+  lastUpdateCheck = Date.now();
+  try {
+    const html = await (await fetch(`./?check=${Date.now()}`, { cache: "no-store" })).text();
+    const live = /app\.js\?v=(\w+)/.exec(html)?.[1];
+    if (live && live !== VERSION) $("update-banner").hidden = false;
+  } catch {}
+}
+$("update-now").onclick = () => location.reload();
+$("update-later").onclick = () => ($("update-banner").hidden = true);
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkForUpdate());
+setInterval(checkForUpdate, 30 * 60000);
+setTimeout(checkForUpdate, 10000);
+
+// ---------- install prompt ----------
+
+const INSTALL_SNOOZE_KEY = "partsong.install.snoozed";
+const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const snoozed = () => {
+  try {
+    return Date.now() - Number(localStorage.getItem(INSTALL_SNOOZE_KEY) || 0) < 30 * 864e5;
+  } catch {
+    return false;
+  }
+};
+let installPrompt = null;
+function showInstallCard(ios) {
+  if (installed() || snoozed()) return;
+  $("install-ios").hidden = !ios;
+  $("install-now").hidden = ios;
+  $("install-card").hidden = false;
+}
+// Chrome/Edge (Android, desktop): use the browser's own install prompt.
+addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  showInstallCard(false);
+});
+// iPhone/iPad Safari has no prompt: show the steps instead.
+if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !installed()) showInstallCard(true);
+$("install-now").onclick = async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  const { outcome } = await installPrompt.userChoice;
+  installPrompt = null;
+  if (outcome === "accepted") $("install-card").hidden = true;
+};
+$("install-later").onclick = () => {
+  $("install-card").hidden = true;
+  try {
+    localStorage.setItem(INSTALL_SNOOZE_KEY, String(Date.now()));
+  } catch {}
+};
+addEventListener("appinstalled", () => ($("install-card").hidden = true));
+
 const DELETE_ICON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
 
