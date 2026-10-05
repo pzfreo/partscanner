@@ -7,7 +7,7 @@ const page = "../testdata/" + (new URLSearchParams(location.search).get("page") 
 window.result = null;
 w.onmessage = async ({ data }) => {
   if (data.type === "progress" && data.stage === "download") return;
-  log(JSON.stringify(data).slice(0, 300));
+  log(data.type === "error" ? "ERROR " + data.msg : JSON.stringify(data).slice(0, 300));
   if (data.type === "ready") {
     const img = await (await fetch(page)).arrayBuffer();
     w.postMessage({ type: "recognise", id: 1, image: img }, [img]);

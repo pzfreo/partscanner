@@ -111,6 +111,9 @@ const TYPED = {
   bool: Uint8Array,
 };
 
+const kept = new Map(); // handle -> ort.Tensor
+let lastKept = 0;
+
 // Called from omr/onnxruntime.py.
 self.omrOrt = {
   async create(name) {
@@ -128,22 +131,49 @@ self.omrOrt = {
     return { id: sessionIds.get(name), inputNames: s.inputNames, outputNames: s.outputNames };
   },
 
-  async run(id, names, feeds) {
+  // feeds: [name, type, dims, bytes], or [name, "kept", handle] for an output
+  // kept from an earlier run. Outputs named in `keep` stay here as handles
+  // (homr's decoder cache: Python only passes it back in on the next step, so
+  // copying it across every step was most of the decoder's time). A kept
+  // tensor is released once it has been passed back in.
+  async run(id, names, feeds, keep = []) {
+    const t0 = performance.now();
     const inputs = {};
+    const used = [];
     for (const [name, type, dims, bytes] of feeds) {
-      inputs[name] = new ort.Tensor(type, new TYPED[type](bytes.slice().buffer), dims);
+      if (type === "kept") {
+        inputs[name] = kept.get(dims);
+        used.push(dims);
+      } else inputs[name] = new ort.Tensor(type, new TYPED[type](bytes.slice().buffer), dims);
     }
     const out = await sessions[id].run(inputs, names);
+    for (const h of used) kept.delete(h);
+    const t = (runTimes[id] ??= { calls: 0, ms: 0 });
+    t.calls++;
+    t.ms += performance.now() - t0;
     return names.map((n) => {
       const t = out[n];
+      if (keep.includes(n)) {
+        kept.set(++lastKept, t);
+        return { type: t.type, dims: t.dims, handle: lastKept };
+      }
       const d = t.data;
-      return { type: t.type, dims: t.dims, data: new Uint8Array(d.buffer, d.byteOffset, d.byteLength) };
+      return { type: t.type, dims: t.dims, data: new Uint8Array(d.buffer, d.byteOffset, d.byteLength), handle: 0 };
     });
+  },
+
+  // The contents of a kept output, if Python does want to read one.
+  data(handle) {
+    const d = kept.get(handle).data;
+    return new Uint8Array(d.buffer, d.byteOffset, d.byteLength);
   },
 };
 
 let pyodide;
 let recognise;
+// Per page: time inside each model (session id -> { calls, ms }); the rest of
+// the page's time is homr's Python (image processing, decoding) in Pyodide.
+let runTimes = [];
 
 async function init() {
   if (typeof WebAssembly.Suspending !== "function") {
@@ -192,8 +222,14 @@ self.onmessage = async ({ data }) => {
       const path = `/tmp/page${data.id}.png`;
       pyodide.FS.writeFile(path, new Uint8Array(data.image));
       const t0 = performance.now();
+      runTimes = [];
       const xml = await recognise.callPromising(path);
-      post({ type: "result", id: data.id, xml, ms: Math.round(performance.now() - t0) });
+      const ms = Math.round(performance.now() - t0);
+      const names = [...sessionIds.keys()];
+      const parts = names.map((n) => `${n.split("_")[0]} ${Math.round(runTimes[sessionIds.get(n)]?.ms ?? 0)} ms/${runTimes[sessionIds.get(n)]?.calls ?? 0} calls`);
+      const inModels = runTimes.reduce((sum, t) => sum + (t?.ms ?? 0), 0);
+      post({ type: "log", msg: `Page in ${ms} ms: ${parts.join(", ")}; Python ${Math.round(ms - inModels)} ms` });
+      post({ type: "result", id: data.id, xml, ms });
     }
   } catch (e) {
     post({ type: "error", id: data.id, msg: String(e && e.message ? e.message : e) });

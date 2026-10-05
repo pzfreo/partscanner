@@ -39,11 +39,22 @@ class _NodeArg:
 
 
 class OrtValue:
-    def __init__(self, array):
+    """A tensor: a numpy array, or (handle set) one kept on the JS side."""
+
+    def __init__(self, array, handle=None):
         self._array = array
+        self._handle = handle
 
     def numpy(self):
+        if self._array is None:
+            self._array = np.frombuffer(js.omrOrt.data(self._handle).to_bytes(), dtype=self._dtype).reshape(self._dims)
         return self._array
+
+    @staticmethod
+    def _kept(handle, dtype, dims):
+        value = OrtValue(None, handle)
+        value._dtype, value._dims = dtype, dims
+        return value
 
     @staticmethod
     def ortvalue_from_numpy(array, *args, **kwargs):
@@ -61,7 +72,7 @@ class IOBinding:
         self._inputs[name] = np.ascontiguousarray(array)
 
     def bind_ortvalue_input(self, name, value):
-        self._inputs[name] = value._array
+        self._inputs[name] = value if value._handle is not None else value._array
 
     def bind_output(self, name, *args, **kwargs):
         if name not in self._output_names:
@@ -98,16 +109,25 @@ class InferenceSession:
         return [v.numpy() for v in self._run(names, feeds)]
 
     def run_with_iobinding(self, iobinding=None, *args, **kwargs):
-        iobinding._outputs = self._run(iobinding._output_names, iobinding._inputs)
+        # homr's decoder cache ("cache_out*") only goes back in on the next
+        # step, so it stays on the JS side (see omr-worker.js).
+        keep = [n for n in iobinding._output_names if n.startswith("cache_out")]
+        iobinding._outputs = self._run(iobinding._output_names, iobinding._inputs, keep)
 
-    def _run(self, names, feeds):
+    def _run(self, names, feeds, keep=()):
         js_feeds = [
-            to_js([name, str(a.dtype), list(a.shape), _to_js_bytes(a)]) for name, a in feeds.items()
+            to_js([name, "kept", a._handle, None])
+            if isinstance(a, OrtValue)
+            else to_js([name, str(a.dtype), list(a.shape), _to_js_bytes(a)])
+            for name, a in feeds.items()
         ]
-        results = run_sync(js.omrOrt.run(self._id, to_js(names), to_js(js_feeds)))
+        results = run_sync(js.omrOrt.run(self._id, to_js(names), to_js(js_feeds), to_js(list(keep))))
         outputs = []
         for r in results:
             dtype = _DTYPES[r.type]
-            array = np.frombuffer(r.data.to_bytes(), dtype=dtype).reshape(r.dims.to_py())
-            outputs.append(OrtValue(array))
+            dims = r.dims.to_py()
+            if r.handle:  # 0: not kept (handles start at 1)
+                outputs.append(OrtValue._kept(r.handle, dtype, dims))
+            else:
+                outputs.append(OrtValue(np.frombuffer(r.data.to_bytes(), dtype=dtype).reshape(dims)))
         return outputs
