@@ -50,6 +50,18 @@ then *Add to Home screen*.
   with OpenSheetMusicDisplay (to spot recognition errors). Both follow along
   (bar highlight + playhead; the note marker and marking are on Pages) and take
   a tap on a bar as the start. Imported MusicXML opens on As read.
+- **Share by link** (`share.js`, `relay/`): sharing uploads the score's PDF,
+  encrypted on the phone (AES-GCM), to a Cloudflare Worker + R2 relay, and
+  shares a link `https://partsong.app/#s=<id>.<key>` (as the message text, and
+  inside the PDF) together with the PDF. The key is only in the #fragment, which
+  browsers never send, so the relay can't read scores. Tapping the link fetches
+  and decrypts it and asks before adding, the same in Safari, Chrome or the
+  installed app (also when Partsong is already open: `hashchange`). If the
+  upload fails, only the PDF is shared, without a link; if a link has expired
+  (a year, by the bucket's lifecycle rule) or the relay is down, the app says
+  the full score is in the PDF. `tests/drive-relay.js` (needs `wrangler dev`, see
+  its header). The relay only accepts uploads from partsong.app, up to 40 MB,
+  starting with the app's marker, and never overwrites.
 - **Sharing** (`share.js`): the share icon (by the score title, or on each
   library row) makes one `.partsong.pdf`: a real PDF of the page photos (JPEG,
   marked `/PartsongPhoto n`) that any phone opens, with the recognised MusicXML,
@@ -165,6 +177,8 @@ node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" ou
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 120 tests/drive-open-with.js shot
+(cd relay && npx wrangler dev --port 8787 --var "ORIGINS:http://localhost:8765" &)
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 300 tests/drive-relay.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-manual.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-lock.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-views.js shot

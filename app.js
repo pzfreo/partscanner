@@ -3,7 +3,7 @@ import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
-import { entryFromLink, isMobile, parseScoreFile, readScoreFile, scoreFile, shareFile } from "./share.js";
+import { entryFromLink, entryFromRelay, isMobile, parseScoreFile, readScoreFile, scoreFile, shareableScore, shareFile } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -773,24 +773,28 @@ async function importScore(entry) {
   openScore(entry);
 }
 
-// Shares a library score. Preparing the file can outlast the browser's
-// "just tapped" window for the share sheet; then the file is kept and the
-// next tap shares it straight away.
-let prepared = null; // { id, file, title }
+// Shares a library score: a link (through the relay, see share.js) plus the
+// PDF, or just the PDF if the relay couldn't take it. Preparing can outlast
+// the browser's "just tapped" window for the share sheet; then it's kept and
+// the next tap shares it straight away.
+let prepared = null; // { id, file, link, title }
 async function shareScore(id, button, status) {
   button.disabled = true;
   try {
     if (prepared?.id !== id) {
       status.textContent = "Preparing…";
       const entry = (await db.all()).find((e) => e.id === id);
-      prepared = { id, file: await scoreFile(entry), title: entry.title };
+      prepared = { id, ...(await shareableScore(entry)), title: entry.title };
     }
-    const how = await shareFile(prepared.file, prepared.title);
+    const how = await shareFile(prepared.file, prepared.title, prepared.link);
+    // Desktop: the PDF downloads; the link goes on the clipboard to paste.
+    if (how === "downloaded" && prepared.link) await navigator.clipboard?.writeText(prepared.link).catch(() => {});
+    const linked = !!prepared.link;
     if (how === "shared" || how === "downloaded") track("share");
     if (how !== "retry") prepared = null;
     status.textContent = {
-      shared: "Shared.",
-      downloaded: "Saved to Downloads.",
+      shared: linked ? "Shared." : "Shared as a PDF (the link service didn't respond).",
+      downloaded: linked ? "Saved to Downloads, and the link is copied." : "Saved to Downloads.",
       cancelled: "",
       retry: "Ready. Tap share again.",
     }[how];
@@ -818,6 +822,28 @@ async function copyScore(id) {
   $("library-status").textContent = `Copied as “${copy.title}”. Open it to rename.`;
   clearTimeout(shareScore.timer);
   shareScore.timer = setTimeout(() => ($("library-status").textContent = ""), 5000);
+}
+
+// A score shared by link (#s=<id>.<key>): fetched from the relay and
+// decrypted, then offered like any other. If the relay can't supply it, say
+// where the full score is instead: the PDF that came with the link.
+async function receiveFromRelay() {
+  const fragment = location.hash.slice(1);
+  history.replaceState(null, "", location.pathname);
+  $("library-status").textContent = "Fetching the shared score…";
+  let entry = null;
+  let failure = "";
+  for (let attempt = 0; attempt < 2 && !entry && !failure.includes("404"); attempt++) {
+    entry = await entryFromRelay(fragment).catch((e) => ((failure = e.message), null));
+    if (!entry && !attempt) await new Promise((r) => setTimeout(r, 3000));
+  }
+  $("library-status").textContent = "";
+  if (entry) offerImport(entry);
+  else
+    showNotice(
+      (failure.includes("404") ? "This link has expired. " : "Couldn't fetch this score just now. ") +
+        "The full score is in the PDF that came with the link: share it to Partsong, or open it with Open file.",
+    );
 }
 
 // A score handed over by an older .partsong.html file opened in the browser (from
@@ -1747,7 +1773,9 @@ if ("serviceWorker" in navigator && location.hostname !== "localhost") {
   navigator.serviceWorker.register("sw.js");
 }
 
-if (/^#(receive|import=)/.test(location.hash)) {
+if (location.hash.startsWith("#s=")) {
+  renderLibrary().then(receiveFromRelay);
+} else if (/^#(receive|import=)/.test(location.hash)) {
   renderLibrary().then(receiveFromPage);
 } else if (new URLSearchParams(location.search).has("inbox")) {
   history.replaceState(null, "", location.pathname);
@@ -1778,4 +1806,11 @@ window.launchQueue?.setConsumer(async ({ files: handles }) => {
     loadScan();
     await addFiles(scans);
   }
+});
+
+// A link tapped while Partsong is already open (e.g. the installed app) only
+// changes the #fragment, without reloading.
+addEventListener("hashchange", () => {
+  if (location.hash.startsWith("#s=")) receiveFromRelay();
+  else if (/^#(receive|import=)/.test(location.hash)) receiveFromPage();
 });
