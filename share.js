@@ -167,6 +167,21 @@ async function relayFetch(path, init = {}) {
   }
 }
 
+// A fingerprint of everything a share carries (title, music, settings, photo
+// sizes): the same fingerprint means the same score, so its link can be reused.
+export async function shareKey(entry) {
+  const what = JSON.stringify([
+    entry.title,
+    entry.pages,
+    SETTINGS.map((k) => entry[k] ?? null),
+    (entry.images ?? []).map((b) => b.size),
+  ]);
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(what));
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+// Links last a year on the relay; reuse one only while it has a while to run.
+export const LINK_REUSE_MS = 330 * 864e5;
+
 // What a share sends: { file, link }; link null when the relay couldn't take
 // it (then the file is shared).
 export async function shareableScore(entry) {

@@ -332,6 +332,9 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .hint { font-size: 0.85rem; margin: 2px 0 8px; color: var(--muted); }
 .row2 { display: flex; gap: 10px; margin: 2px 0 4px; }
 .row2 button { flex: 1; padding: 10px 8px; }
+/* Ready to share at once (no preparing): filled, with a tick. */
+.row2 button.ready { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.row2 button.ready::before { content: "✓\00a0"; }
 .bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
 .lock-box { flex: 1; display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .lock-box .check { flex: 1; }

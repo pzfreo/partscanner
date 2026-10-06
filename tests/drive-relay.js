@@ -33,9 +33,30 @@ const pdfHasLink = async (file) => (await file.text()).includes("/URI");
 let s = await share();
 const link = s.shared.text?.match(/https?:\S+#s=\S+/)?.[0];
 r.relayUp = { status: s.status, text: s.shared.text?.replace(/#s=\S+/, "#s=…"), files: s.shared.files?.length ?? 0 };
-// Share Partsong score in settings: the same link share.
+// Share part with score in settings: the same link share, and since nothing
+// has changed, the same link again, at once (no "Preparing…").
+const sameAgain = async () => {
+  shared = null;
+  $("settings").click(); await sleep(300);
+  const ready = $("share-score").classList.contains("ready");
+  $("share-score").click();
+  await sleep(50);
+  const label = $("share-score").textContent;
+  await waitFor(() => shared, 30000, "share again");
+  $("panel-close").click(); await sleep(200);
+  return { ready, labelJustAfterTap: label, link: shared.text?.match(/#s=\S+/)?.[0] };
+};
 s = await share("share-score", "share-score");
 r.settingsButton = { status: s.status, isLink: /#s=/.test(s.shared.text ?? ""), files: s.shared.files?.length ?? 0 };
+const again = await sameAgain();
+r.unchangedReuses = { ready: again.ready, labelJustAfterTap: again.labelJustAfterTap, sameLink: again.link === link.match(/#s=\S+/)[0] };
+// A change (tempo) means a new link, and the button isn't ready.
+$("settings").click(); await sleep(300);
+$("tempo").value = 90; $("tempo").dispatchEvent(new Event("input", { bubbles: true })); $("tempo").dispatchEvent(new Event("change", { bubbles: true })); await sleep(600);
+r.changedNotReady = !$("share-score").classList.contains("ready");
+$("panel-close").click(); await sleep(200);
+s = await share("share-score", "share-score");
+r.changedNewLink = !!s.shared.text && !s.shared.text.includes(link.match(/#s=\S+/)[0]);
 
 // 2. The link opened elsewhere: the whole score is offered and added.
 const frame = (src) => { const f = document.createElement("iframe"); f.src = src; document.body.append(f); return f; };
@@ -61,6 +82,10 @@ r.expiredNotice = await offerIn(f, "expired notice");
 
 // 5. Relay down when sharing: the PDF instead, no link anywhere.
 localStorage.setItem("partsong.relay", "http://localhost:9");
+// (A change first, or the kept link would be shared without uploading.)
+$("settings").click(); await sleep(300);
+$("tempo").value = 100; $("tempo").dispatchEvent(new Event("input", { bubbles: true })); $("tempo").dispatchEvent(new Event("change", { bubbles: true })); await sleep(600);
+$("panel-close").click(); await sleep(200);
 s = await share();
 r.relayDown = { status: s.status, text: s.shared.text ?? null, file: s.shared.files[0].name, pdfHasLink: await pdfHasLink(s.shared.files[0]) };
 localStorage.removeItem("partsong.relay");

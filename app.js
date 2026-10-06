@@ -4,7 +4,7 @@ import { AUDIO_RATE, audioFile } from "./audio.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
-import { entryFromLink, entryFromRelay, isMobile, parseScoreFile, readScoreFile, scoreFile, shareableScore, shareFile, shareLink } from "./share.js";
+import { entryFromLink, entryFromRelay, isMobile, LINK_REUSE_MS, parseScoreFile, readScoreFile, scoreFile, shareableScore, shareFile, shareKey, shareLink } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -803,14 +803,51 @@ function shareReporter(button, status, label) {
 }
 
 let prepared = null; // { id, file, link, title }
+
+// The link a score was last shared with, kept with the score, while it still
+// matches (same fingerprint) and has time to run on the relay.
+// A stored score with the open score's live settings on top (tempo and the
+// others' volume are only saved when a slider is let go).
+function liveEntry(entry) {
+  if (!entry || entry.id !== current?.id) return entry;
+  const live = { ...entry, tempo: Number($("tempo").value), others: Number($("others").value) };
+  for (const k of ["title", "mine", "excluded", "manual", "octave", "locked", "repeats", "playRepeats"]) if (current[k] !== undefined) live[k] = current[k];
+  return live;
+}
+
+async function reusableLink(entry, key) {
+  const kept = entry.shareLink;
+  return kept && kept.key === (key ?? (await shareKey(entry))) && Date.now() - kept.at < LINK_REUSE_MS ? kept.link : null;
+}
+async function rememberLink(id, shareLink) {
+  await db.update(id, { shareLink }).catch(() => {});
+  if (current?.id === id) current.shareLink = shareLink;
+  updateShareReady();
+}
+
+// Share buttons look "ready" when a tap will share at once (a kept link, or
+// audio already made for these settings), and plain when it has to prepare.
+async function updateShareReady() {
+  if (!current) return;
+  const entry = liveEntry((await db.all()).find((e) => e.id === current.id));
+  $("share-score").classList.toggle("ready", !!(entry && (await reusableLink(entry))));
+  $("share-audio").classList.toggle("ready", !!preparedAudio && preparedAudio.key === audioKey());
+}
 async function shareScore(id, button, status, label) {
   const say = shareReporter(button, status, label);
   button.disabled = true;
   try {
     if (prepared?.id !== id) {
-      say("busy", "Preparing to share…", "Preparing…");
-      const entry = (await db.all()).find((e) => e.id === id);
-      prepared = { id, ...(await shareableScore(entry)), title: entry.title };
+      const entry = liveEntry((await db.all()).find((e) => e.id === id));
+      const key = await shareKey(entry);
+      // Unchanged since it was last shared: the same link, straight away.
+      const kept = await reusableLink(entry, key);
+      if (kept) prepared = { id, link: kept, file: null, title: entry.title };
+      else {
+        say("busy", "Preparing to share…", "Preparing…");
+        prepared = { id, ...(await shareableScore(entry)), title: entry.title };
+        if (prepared.link) await rememberLink(id, { key, link: prepared.link, at: Date.now() });
+      }
     }
     const linked = !!prepared.link;
     const how = linked ? await shareLink(prepared.link, prepared.title) : await shareFile(prepared.file, prepared.title);
@@ -848,6 +885,7 @@ function updateAudioButton() {
     clearTimeout($("share-audio").revert);
     $("share-audio").textContent = "Share audio";
   }
+  updateShareReady();
 }
 $("share-audio").onclick = async () => {
   const button = $("share-audio");
@@ -864,6 +902,7 @@ $("share-audio").onclick = async () => {
       renderer.instrument = $("instrument").value;
       const name = `${current.title} - ${part}`.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
       preparedAudio = { key, part, file: await audioFile(await renderer.render(playSegments(), AUDIO_RATE), name) };
+      button.classList.add("ready");
     }
     const how = await shareFile(preparedAudio.file, `${current.title} (${preparedAudio.part})`);
     if (how === "shared" || how === "downloaded") track("share-audio");
