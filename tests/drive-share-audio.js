@@ -13,7 +13,9 @@ await sleep(800);
 
 let shared;
 Object.defineProperty(navigator, "userAgentData", { value: { mobile: true }, configurable: true });
-navigator.canShare = () => true;
+// As Chrome's share sheet: only its permitted file types (audio/mp4 isn't one).
+const PERMITTED = ["audio/x-m4a", "audio/wav", "audio/mpeg", "audio/mp3", "audio/ogg", "audio/webm", "audio/flac"];
+navigator.canShare = ({ files }) => files.every((f) => PERMITTED.includes(f.type));
 navigator.share = async ({ files, title }) => { shared = { file: files[0], title }; };
 const shareAudio = async () => {
   shared = null;

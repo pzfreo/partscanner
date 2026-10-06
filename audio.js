@@ -40,7 +40,7 @@ async function m4a(samples, sampleRate) {
   encoder.close();
   if (failed) throw failed;
   muxer.finalize();
-  return new Blob([target.buffer], { type: "audio/mp4" });
+  return new Blob([target.buffer], { type: "audio/x-m4a" });
 }
 
 function wav(samples, sampleRate) {
@@ -68,7 +68,8 @@ export async function audioFile(buffer, name) {
   const samples = normalised(buffer);
   if (await aacSupported(buffer.sampleRate)) {
     try {
-      return new File([await m4a(samples, buffer.sampleRate)], `${name}.m4a`, { type: "audio/mp4" });
+      // audio/x-m4a: the type Chrome's share sheet accepts for .m4a (not audio/mp4).
+      return new File([await m4a(samples, buffer.sampleRate)], `${name}.m4a`, { type: "audio/x-m4a" });
     } catch {}
   }
   return new File([wav(samples, buffer.sampleRate)], `${name}.wav`, { type: "audio/wav" });
