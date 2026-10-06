@@ -21,15 +21,19 @@ const shareAudio = async () => {
   shared = null;
   $("settings").click(); await sleep(300);
   const t0 = performance.now();
-  $("share-audio").click();
-  await waitFor(() => shared || $("share-audio-status").textContent.startsWith("Couldn't"), 120000, "audio share");
+  const before = $("share-audio").textContent;
+  $("share-audio").click(); // Prepare audio
+  await waitFor(() => $("share-audio").textContent === "Share audio" || $("share-audio-status").textContent.startsWith("Couldn't"), 120000, "audio prepared");
   const ms = Math.round(performance.now() - t0);
+  const after = $("share-audio").textContent;
+  $("share-audio").click(); // Share audio
+  await waitFor(() => shared || $("share-audio-status").textContent.startsWith("Couldn't"), 10000, "audio share");
   $("panel-close").click(); await sleep(200);
   if (!shared) return { error: $("share-audio-status").textContent };
   const buf = await new AudioContext().decodeAudioData(await shared.file.arrayBuffer());
   const d = buf.getChannelData(0);
   let sq = 0; for (const v of d) sq += v * v;
-  return { name: shared.file.name, type: shared.file.type, kb: Math.round(shared.file.size / 1024), seconds: +buf.duration.toFixed(1), rms: +Math.sqrt(sq / d.length).toFixed(4), title: shared.title, ms };
+  return { labels: [before, after], name: shared.file.name, type: shared.file.type, kb: Math.round(shared.file.size / 1024), seconds: +buf.duration.toFixed(1), rms: +Math.sqrt(sq / d.length).toFixed(4), title: shared.title, ms };
 };
 const r = {};
 const bars = Number($("to-bar").value);
@@ -45,6 +49,10 @@ delete window.AudioEncoder;
 $("others").value = 25; $("others").dispatchEvent(new Event("input"));
 $("tempo").value = 121; $("tempo").dispatchEvent(new Event("input")); // a change, so it renders again
 r.wav = await shareAudio();
+// Reopening the panel with nothing changed: still ready to share.
+$("settings").click(); await sleep(300);
+r.reopenedLabel = $("share-audio").textContent;
+$("panel-close").click(); await sleep(200);
 window.AudioEncoder = enc;
 r.bars = bars;
 window.result = r;

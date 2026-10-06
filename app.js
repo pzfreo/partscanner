@@ -816,33 +816,45 @@ async function shareScore(id, button, status, asPdf = false) {
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
 // An audio file of what Play plays (bars, repeats, your part, the others'
 // volume, sound, tempo and pitch), rendered offline, to share: e.g. for
-// someone to learn their part from on the way to rehearsal. Rendering takes a
-// few seconds, longer than the share sheet's "just tapped" window; then the
-// file is kept and the next tap shares it, as long as nothing has changed.
-let preparedAudio = null; // { key, file }
+// someone to learn their part from on the way to rehearsal. Two taps: the
+// share sheet only opens within a few seconds of a tap, and rendering can take
+// longer on a phone, so "Prepare audio" makes the file and the button becomes
+// "Share audio". Changing anything that's heard makes it "Prepare audio" again.
+let preparedAudio = null; // { key, file, part }
+function audioKey() {
+  return JSON.stringify([current?.id, playSegments(), current.mine, current.manual, current.excluded, current.octave, othersGain, $("instrument").value, $("tempo").value]);
+}
+// Called when the settings panel opens: the label follows what's prepared.
+function updateAudioButton() {
+  const ready = preparedAudio && preparedAudio.key === audioKey();
+  $("share-audio").textContent = ready ? "Share audio" : "Prepare audio";
+  if (!ready) $("share-audio-status").textContent = "";
+}
 $("share-audio").onclick = async () => {
   const button = $("share-audio");
   const status = $("share-audio-status");
-  const marks = hasMarks();
-  const part = marks ? "my part" : (score.lines[current.mine]?.label ?? "part");
-  const segments = playSegments();
-  const key = JSON.stringify([current.id, segments, current.mine, current.manual, current.excluded, current.octave, othersGain, $("instrument").value, $("tempo").value]);
   button.disabled = true;
   try {
+    const key = audioKey();
     if (preparedAudio?.key !== key) {
       status.textContent = "Making the audio…";
+      const part = hasMarks() ? "my part" : (score.lines[current.mine]?.label ?? "part");
       const renderer = new Player(score);
       renderer.mix = player.mix;
       renderer.bpm = Number($("tempo").value);
       renderer.instrument = $("instrument").value;
-      const file = await audioFile(await renderer.render(segments, AUDIO_RATE), `${current.title} - ${part}`.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim());
-      preparedAudio = { key, file };
+      const name = `${current.title} - ${part}`.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
+      preparedAudio = { key, part, file: await audioFile(await renderer.render(playSegments(), AUDIO_RATE), name) };
+      button.textContent = "Share audio";
+      status.textContent = "Ready.";
+      return;
     }
-    const how = await shareFile(preparedAudio.file, `${current.title} (${part})`);
+    const how = await shareFile(preparedAudio.file, `${current.title} (${preparedAudio.part})`);
     if (how === "shared" || how === "downloaded") track("share-audio");
-    status.textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "", retry: "Ready. Tap Share audio again." }[how];
+    status.textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "", retry: "Tap Share audio again." }[how];
   } catch (e) {
     preparedAudio = null;
+    button.textContent = "Prepare audio";
     status.textContent = `Couldn't make the audio: ${e.message}`;
   } finally {
     button.disabled = false;
@@ -1557,11 +1569,14 @@ function setPanel(open, nav = true) {
   $("panel").hidden = !open;
   $("panel-backdrop").hidden = !open;
   $("settings").setAttribute("aria-expanded", String(open));
+  if (open && current) updateAudioButton();
   if (!nav || open === wasOpen) return;
   if (open) history.pushState({ screen: "practice", panel: true }, "");
   else if (history.state?.panel) history.back();
 }
 $("settings").onclick = () => setPanel($("panel").hidden);
+// A change to anything that's heard means the audio needs preparing again.
+for (const type of ["input", "change"]) $("panel").addEventListener(type, () => current && updateAudioButton());
 $("panel-close").onclick = () => setPanel(false);
 $("panel-backdrop").onclick = () => setPanel(false);
 

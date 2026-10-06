@@ -175,6 +175,11 @@
           <span class="grab" aria-hidden="true"></span>
           <button id="panel-close" class="panel-close">Done</button>
         </div>
+        <div class="audio-share">
+          <button id="share-audio">Prepare audio</button>
+          <p class="muted">An audio file of what Play plays: these bars, your part, the others at their volume, this sound and tempo. Turn the others down to 0 for your part alone.</p>
+          <p id="share-audio-status" class="muted share-status" aria-live="polite"></p>
+        </div>
         <label class="lock-row">
           <input type="checkbox" id="lock">
           <span><strong>Lock this score</strong><br><span class="muted">Stops changes to your part, the title and Delete.</span></span>
@@ -226,9 +231,6 @@
           </div>
         </div>
 
-        <button id="share-audio">Share audio</button>
-        <p class="muted">What Play plays (these bars, your part, the others at their volume, this sound and tempo) as an audio file. Turn the other parts down to 0 for your part alone.</p>
-        <p id="share-audio-status" class="muted share-status" aria-live="polite"></p>
         <button id="share-pdf">Share as PDF</button>
         <p class="muted">A file of the pages with the music inside: it keeps working after a shared link expires (a year). Open it with Partsong's Open file, or share it to the Partsong app.</p>
         <p id="share-pdf-status" class="muted share-status" aria-live="polite"></p>
