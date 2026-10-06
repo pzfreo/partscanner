@@ -34,7 +34,7 @@ let s = await share();
 const link = s.shared.text?.match(/https?:\S+#s=\S+/)?.[0];
 r.relayUp = { status: s.status, text: s.shared.text?.replace(/#s=\S+/, "#s=…"), files: s.shared.files?.length ?? 0 };
 // Share Partsong score in settings: the same link share.
-s = await share("share-score", "share-score-status");
+s = await share("share-score", "share-score");
 r.settingsButton = { status: s.status, isLink: /#s=/.test(s.shared.text ?? ""), files: s.shared.files?.length ?? 0 };
 
 // 2. The link opened elsewhere: the whole score is offered and added.

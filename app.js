@@ -782,12 +782,33 @@ async function importScore(entry) {
 // the PDF when the relay couldn't take it. Preparing can outlast
 // the browser's "just tapped" window for the share sheet; then it's kept and
 // the next tap shares it straight away.
+// How a share reports progress: on the button itself when it has words
+// (Preparing… / Ready to share / Shared ✓, then its label again; errors in the
+// error banner), or on a status line for the icon buttons.
+function shareReporter(button, status, label) {
+  clearTimeout(button.revert);
+  if (!status) {
+    return (kind, long, short) => {
+      clearTimeout(button.revert);
+      if (kind === "error") showError(long);
+      button.textContent = kind === "error" || kind === "idle" ? label : short;
+      if (kind === "done") button.revert = setTimeout(() => (button.textContent = label), 2500);
+    };
+  }
+  return (kind, long) => {
+    clearTimeout(button.revert);
+    status.textContent = long;
+    if (kind !== "busy" && kind !== "ready") button.revert = setTimeout(() => (status.textContent = ""), 4000);
+  };
+}
+
 let prepared = null; // { id, file, link, title }
-async function shareScore(id, button, status) {
+async function shareScore(id, button, status, label) {
+  const say = shareReporter(button, status, label);
   button.disabled = true;
   try {
     if (prepared?.id !== id) {
-      status.textContent = "Preparing to share…";
+      say("busy", "Preparing to share…", "Preparing…");
       const entry = (await db.all()).find((e) => e.id === id);
       prepared = { id, ...(await shareableScore(entry)), title: entry.title };
     }
@@ -795,24 +816,21 @@ async function shareScore(id, button, status) {
     const how = linked ? await shareLink(prepared.link, prepared.title) : await shareFile(prepared.file, prepared.title);
     if (how === "shared" || how === "downloaded" || how === "copied") track(linked ? "share" : "share-pdf");
     if (how !== "retry") prepared = null;
-    status.textContent = {
-      shared: linked ? "Shared." : "Shared as a PDF (the link service didn't respond).",
-      copied: "Link copied: paste it into a message.",
-      downloaded: "Saved to Downloads.",
-      cancelled: "",
-      retry: "Ready to share: tap again.",
-    }[how];
+    if (how === "retry") say("ready", "Ready to share: tap again.", "Ready to share");
+    else if (how === "cancelled") say("idle", "");
+    else if (how === "copied") say("done", "Link copied: paste it into a message.", "Link copied ✓");
+    else if (how === "downloaded") say("done", "Saved to Downloads.", "Saved ✓");
+    else say("done", linked ? "Shared." : "Shared as a PDF (the link service didn't respond).", linked ? "Shared ✓" : "Shared as PDF ✓");
   } catch (e) {
     prepared = null;
-    status.textContent = `Couldn't share: ${e.message}`;
+    say("error", `Couldn't share: ${e.message}`);
   } finally {
     button.disabled = false;
-    clearTimeout(shareScore.timer);
-    if (!prepared) shareScore.timer = setTimeout(() => (status.textContent = ""), 4000);
   }
 }
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
+
 // An audio file of what Play plays (bars, repeats, your part, the others'
 // volume, sound, tempo and pitch), rendered offline, to share: e.g. for
 // someone to learn their part from on the way to rehearsal. The share sheet
@@ -823,21 +841,22 @@ let preparedAudio = null; // { key, file, part }
 function audioKey() {
   return JSON.stringify([current?.id, playSegments(), current.mine, current.manual, current.excluded, current.octave, othersGain, $("instrument").value, $("tempo").value]);
 }
-// A prepared file that no longer matches the settings is dropped, with its note.
+// A prepared file that no longer matches the settings is dropped.
 function updateAudioButton() {
   if (preparedAudio && preparedAudio.key !== audioKey()) {
     preparedAudio = null;
-    $("share-audio-status").textContent = "";
+    clearTimeout($("share-audio").revert);
+    $("share-audio").textContent = "Share audio";
   }
 }
 $("share-audio").onclick = async () => {
   const button = $("share-audio");
-  const status = $("share-audio-status");
+  const say = shareReporter(button, null, "Share audio");
   button.disabled = true;
   try {
     const key = audioKey();
     if (preparedAudio?.key !== key) {
-      status.textContent = "Preparing to share…";
+      say("busy", "Preparing to share…", "Preparing…");
       const part = hasMarks() ? "my part" : (score.lines[current.mine]?.label ?? "part");
       const renderer = new Player(score);
       renderer.mix = player.mix;
@@ -848,17 +867,19 @@ $("share-audio").onclick = async () => {
     }
     const how = await shareFile(preparedAudio.file, `${current.title} (${preparedAudio.part})`);
     if (how === "shared" || how === "downloaded") track("share-audio");
-    status.textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "", retry: "Ready to share: tap again." }[how];
+    if (how === "retry") say("ready", "", "Ready to share");
+    else if (how === "cancelled") say("idle", "");
+    else say("done", "", how === "downloaded" ? "Saved ✓" : "Shared ✓");
   } catch (e) {
     preparedAudio = null;
-    status.textContent = `Couldn't make the audio: ${e.message}`;
+    say("error", `Couldn't make the audio: ${e.message}`);
   } finally {
     button.disabled = false;
   }
 };
 
 // The same link share as the icon by the title.
-$("share-score").onclick = () => shareScore(current.id, $("share-score"), $("share-score-status"));
+$("share-score").onclick = () => shareScore(current.id, $("share-score"), null, "Share part with score");
 
 // A copy of a score (photos, music, marks, settings), unlocked and named
 // "Title (2)", added to the list (rename it when you open it), e.g. to mark up
@@ -1037,8 +1058,10 @@ function openScore(entry, nav = "push") {
 
   $("title").value = entry.title;
   $("share-status").textContent = "";
-  $("share-score-status").textContent = "";
-  $("share-audio-status").textContent = "";
+  for (const [id, label] of [["share-audio", "Share audio"], ["share-score", "Share part with score"]]) {
+    clearTimeout($(id).revert);
+    $(id).textContent = label;
+  }
   $("to-bar").value = score.measures.length;
   $("from-bar").value = 1;
   $("from-bar").max = $("to-bar").max = score.measures.length;
