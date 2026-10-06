@@ -896,7 +896,7 @@ async function receiveFromRelay() {
   else
     showNotice(
       failure.includes("404")
-        ? "This link has expired. Ask for the score to be shared again (or sent with Share as PDF, which doesn't expire)."
+        ? "This link has expired. Ask for the score to be shared again (or sent with Share Partsong score, which doesn't expire)."
         : "Couldn't fetch this score just now. Check your connection and tap the link again.",
     );
 }
