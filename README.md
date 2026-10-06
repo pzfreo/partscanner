@@ -63,6 +63,12 @@ then *Add to Home screen*.
   to do. `tests/drive-relay.js` (needs `wrangler dev`, see
   its header). The relay only accepts uploads from partsong.app, up to 40 MB,
   starting with the app's marker, and never overwrites.
+- **Share audio** (`audio.js`, `Player.render`): a score's settings can share
+  what Play plays (bars, repeats, your part or marked part, the others' volume,
+  sound, tempo, pitch) as an audio file, rendered offline in a few seconds:
+  AAC in an `.m4a` (WebCodecs `AudioEncoder`, muxed by mp4-muxer from jsdelivr,
+  ~0.6 MB a minute) where the browser can encode AAC, else WAV.
+  `tests/drive-share-audio.js`.
 - **Sharing** (`share.js`): the share icon (by the score title, or on each
   library row) makes one `.partsong.pdf`: a real PDF of the page photos (JPEG,
   marked `/PartsongPhoto n`) that any phone opens, with the recognised MusicXML,
@@ -178,6 +184,7 @@ node scripts/headless-test.mjs "http://localhost:8765/tests/orient-test.html" ou
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 450 tests/drive-pdf.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 100 tests/drive-files.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 120 tests/drive-open-with.js shot
+node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 300 tests/drive-share-audio.js shot
 (cd relay && npx wrangler dev --port 8787 --var "ORIGINS:http://localhost:8765" &)
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 300 tests/drive-relay.js shot
 node scripts/headless-test.mjs "http://localhost:8765/index.html" out.json 180 tests/drive-manual.js shot

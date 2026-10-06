@@ -1,5 +1,6 @@
 import { buildScore, parsePage, playOrder } from "./score.js";
 import { Player } from "./player.js";
+import { AUDIO_RATE, audioFile } from "./audio.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
@@ -809,6 +810,41 @@ async function shareScore(id, button, status, asPdf = false) {
 }
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
+// An audio file of what Play plays (bars, repeats, your part, the others'
+// volume, sound, tempo and pitch), rendered offline, to share: e.g. for
+// someone to learn their part from on the way to rehearsal. Rendering takes a
+// few seconds, longer than the share sheet's "just tapped" window; then the
+// file is kept and the next tap shares it, as long as nothing has changed.
+let preparedAudio = null; // { key, file }
+$("share-audio").onclick = async () => {
+  const button = $("share-audio");
+  const status = $("share-audio-status");
+  const marks = hasMarks();
+  const part = marks ? "my part" : (score.lines[current.mine]?.label ?? "part");
+  const segments = playSegments();
+  const key = JSON.stringify([current.id, segments, current.mine, current.manual, current.excluded, current.octave, othersGain, $("instrument").value, $("tempo").value]);
+  button.disabled = true;
+  try {
+    if (preparedAudio?.key !== key) {
+      status.textContent = "Making the audio…";
+      const renderer = new Player(score);
+      renderer.mix = player.mix;
+      renderer.bpm = Number($("tempo").value);
+      renderer.instrument = $("instrument").value;
+      const file = await audioFile(await renderer.render(segments, AUDIO_RATE), `${current.title} - ${part}`.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim());
+      preparedAudio = { key, file };
+    }
+    const how = await shareFile(preparedAudio.file, `${current.title} (${part})`);
+    if (how === "shared" || how === "downloaded") track("share-audio");
+    status.textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "", retry: "Ready. Tap Share audio again." }[how];
+  } catch (e) {
+    preparedAudio = null;
+    status.textContent = `Couldn't make the audio: ${e.message}`;
+  } finally {
+    button.disabled = false;
+  }
+};
+
 // The PDF itself: a copy that keeps working after the link expires.
 $("share-pdf").onclick = () => shareScore(current.id, $("share-pdf"), $("share-pdf-status"), true);
 
@@ -990,6 +1026,7 @@ function openScore(entry, nav = "push") {
   $("title").value = entry.title;
   $("share-status").textContent = "";
   $("share-pdf-status").textContent = "";
+  $("share-audio-status").textContent = "";
   $("to-bar").value = score.measures.length;
   $("from-bar").value = 1;
   $("from-bar").max = $("to-bar").max = score.measures.length;

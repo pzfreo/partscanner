@@ -104,22 +104,10 @@ export class Player {
     const from = this.scheduledUntil;
     const to = Math.min(horizon, this.total);
     if (to > from) {
-      for (const seg of this.segments) {
-        if (seg.at + (seg.to - seg.from) <= from || seg.at >= to) continue;
-        this.score.lines.forEach((line, i) => {
-          for (const n of line.notes) {
-            if (n.t < seg.from || n.t >= seg.to) continue;
-            const o = seg.at + (n.t - seg.from);
-            if (o < from || o >= to) continue;
-            const dur = Math.min(n.dur, seg.to - n.t);
-            const { gain, shift = 0 } = this.mix(i, n.t);
-            const when = this.startTime + (o - this.startOffset) * secPerBeat;
-            if (gain > 0 && when >= this.ctx.currentTime - MAX_LATE) {
-              this.note(n.midi + shift, gain, when, dur * secPerBeat);
-            }
-          }
-        });
-      }
+      this.eachNote(this.segments, from, to, (midi, gain, o, dur) => {
+        const when = this.startTime + (o - this.startOffset) * secPerBeat;
+        if (when >= this.ctx.currentTime - MAX_LATE) this.note(midi, gain, when, dur * secPerBeat);
+      });
       this.scheduledUntil = to;
     }
     if (horizon >= this.total) {
@@ -131,6 +119,49 @@ export class Player {
       } else if (this.ctx.currentTime > this.startTime + (this.total - this.startOffset) * secPerBeat) {
         this.stop();
       }
+    }
+  }
+
+  // Calls fn(midi, gain, offset, duration) for each audible note whose offset
+  // along `segments` (with their `at`) is in [from, to), as mixed now.
+  eachNote(segments, from, to, fn) {
+    for (const seg of segments) {
+      if (seg.at + (seg.to - seg.from) <= from || seg.at >= to) continue;
+      this.score.lines.forEach((line, i) => {
+        for (const n of line.notes) {
+          if (n.t < seg.from || n.t >= seg.to) continue;
+          const o = seg.at + (n.t - seg.from);
+          if (o < from || o >= to) continue;
+          const { gain, shift = 0 } = this.mix(i, n.t);
+          if (gain > 0) fn(n.midi + shift, gain, o, Math.min(n.dur, seg.to - n.t));
+        }
+      });
+    }
+  }
+
+  // The same playback rendered offline, as fast as it can (for an audio file):
+  // mono AudioBuffer at `rate`, with the current mix, sound and tempo.
+  async render(segments, rate = 22050) {
+    const secPerBeat = 60 / this.bpm;
+    let at = 0;
+    const segs = segments.map((s) => {
+      const seg = { ...s, at };
+      at += s.to - s.from;
+      return seg;
+    });
+    const ctx = new OfflineAudioContext(1, Math.ceil(rate * (at * secPerBeat + 1.5)), rate);
+    const live = [this.ctx, this.master, this.waves, this.active];
+    this.ctx = ctx;
+    this.waves = {};
+    this.active = [];
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.8;
+    this.master.connect(ctx.createDynamicsCompressor()).connect(ctx.destination);
+    try {
+      this.eachNote(segs, 0, at, (midi, gain, o, dur) => this.note(midi, gain, 0.1 + o * secPerBeat, dur * secPerBeat));
+      return await ctx.startRendering();
+    } finally {
+      [this.ctx, this.master, this.waves, this.active] = live;
     }
   }
 
