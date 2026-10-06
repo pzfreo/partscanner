@@ -21,19 +21,24 @@ const shareAudio = async () => {
   shared = null;
   $("settings").click(); await sleep(300);
   const t0 = performance.now();
-  const before = $("share-audio").textContent;
-  $("share-audio").click(); // Prepare audio
-  await waitFor(() => $("share-audio").textContent === "Share audio" || $("share-audio-status").textContent.startsWith("Couldn't"), 120000, "audio prepared");
+  // As on a phone where making the file outlasts the tap: the share sheet
+  // refuses the first time, so it says it's ready and the next tap shares.
+  const realShare = navigator.share;
+  navigator.share = async () => { throw new DOMException("expired", "NotAllowedError"); };
+  $("share-audio").click();
+  const preparing = await waitFor(() => $("share-audio-status").textContent, 5000, "preparing");
+  const ready = await waitFor(() => /Ready|Couldn't/.test($("share-audio-status").textContent) && $("share-audio-status").textContent, 120000, "ready");
   const ms = Math.round(performance.now() - t0);
-  const after = $("share-audio").textContent;
-  $("share-audio").click(); // Share audio
+  navigator.share = realShare;
+  $("share-audio").click();
   await waitFor(() => shared || $("share-audio-status").textContent.startsWith("Couldn't"), 10000, "audio share");
+  const before = preparing, after = ready, label = $("share-audio").textContent;
   $("panel-close").click(); await sleep(200);
   if (!shared) return { error: $("share-audio-status").textContent };
   const buf = await new AudioContext().decodeAudioData(await shared.file.arrayBuffer());
   const d = buf.getChannelData(0);
   let sq = 0; for (const v of d) sq += v * v;
-  return { labels: [before, after], name: shared.file.name, type: shared.file.type, kb: Math.round(shared.file.size / 1024), seconds: +buf.duration.toFixed(1), rms: +Math.sqrt(sq / d.length).toFixed(4), title: shared.title, ms };
+  return { label, statuses: [before, after, $("share-audio-status").textContent], name: shared.file.name, type: shared.file.type, kb: Math.round(shared.file.size / 1024), seconds: +buf.duration.toFixed(1), rms: +Math.sqrt(sq / d.length).toFixed(4), title: shared.title, ms };
 };
 const r = {};
 const bars = Number($("to-bar").value);
@@ -51,7 +56,7 @@ $("tempo").value = 121; $("tempo").dispatchEvent(new Event("input")); // a chang
 r.wav = await shareAudio();
 // Reopening the panel with nothing changed: still ready to share.
 $("settings").click(); await sleep(300);
-r.reopenedLabel = $("share-audio").textContent;
+r.reopenedStatus = $("share-audio-status").textContent;
 $("panel-close").click(); await sleep(200);
 window.AudioEncoder = enc;
 r.bars = bars;

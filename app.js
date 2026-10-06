@@ -787,7 +787,7 @@ async function shareScore(id, button, status) {
   button.disabled = true;
   try {
     if (prepared?.id !== id) {
-      status.textContent = "Preparing…";
+      status.textContent = "Preparing to share…";
       const entry = (await db.all()).find((e) => e.id === id);
       prepared = { id, ...(await shareableScore(entry)), title: entry.title };
     }
@@ -800,7 +800,7 @@ async function shareScore(id, button, status) {
       copied: "Link copied: paste it into a message.",
       downloaded: "Saved to Downloads.",
       cancelled: "",
-      retry: "Ready. Tap share again.",
+      retry: "Ready to share: tap again.",
     }[how];
   } catch (e) {
     prepared = null;
@@ -815,19 +815,20 @@ async function shareScore(id, button, status) {
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
 // An audio file of what Play plays (bars, repeats, your part, the others'
 // volume, sound, tempo and pitch), rendered offline, to share: e.g. for
-// someone to learn their part from on the way to rehearsal. Two taps: the
-// share sheet only opens within a few seconds of a tap, and rendering can take
-// longer on a phone, so "Prepare audio" makes the file and the button becomes
-// "Share audio". Changing anything that's heard makes it "Prepare audio" again.
+// someone to learn their part from on the way to rehearsal. The share sheet
+// only opens within a few seconds of a tap, and rendering can take longer on a
+// phone; then the file is kept ("Ready to share: tap again") until anything
+// that's heard changes.
 let preparedAudio = null; // { key, file, part }
 function audioKey() {
   return JSON.stringify([current?.id, playSegments(), current.mine, current.manual, current.excluded, current.octave, othersGain, $("instrument").value, $("tempo").value]);
 }
-// Called when the settings panel opens: the label follows what's prepared.
+// A prepared file that no longer matches the settings is dropped, with its note.
 function updateAudioButton() {
-  const ready = preparedAudio && preparedAudio.key === audioKey();
-  $("share-audio").textContent = ready ? "Share audio" : "Prepare audio";
-  if (!ready) $("share-audio-status").textContent = "";
+  if (preparedAudio && preparedAudio.key !== audioKey()) {
+    preparedAudio = null;
+    $("share-audio-status").textContent = "";
+  }
 }
 $("share-audio").onclick = async () => {
   const button = $("share-audio");
@@ -836,7 +837,7 @@ $("share-audio").onclick = async () => {
   try {
     const key = audioKey();
     if (preparedAudio?.key !== key) {
-      status.textContent = "Making the audio…";
+      status.textContent = "Preparing to share…";
       const part = hasMarks() ? "my part" : (score.lines[current.mine]?.label ?? "part");
       const renderer = new Player(score);
       renderer.mix = player.mix;
@@ -844,16 +845,12 @@ $("share-audio").onclick = async () => {
       renderer.instrument = $("instrument").value;
       const name = `${current.title} - ${part}`.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim();
       preparedAudio = { key, part, file: await audioFile(await renderer.render(playSegments(), AUDIO_RATE), name) };
-      button.textContent = "Share audio";
-      status.textContent = "Ready.";
-      return;
     }
     const how = await shareFile(preparedAudio.file, `${current.title} (${preparedAudio.part})`);
     if (how === "shared" || how === "downloaded") track("share-audio");
-    status.textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "", retry: "Tap Share audio again." }[how];
+    status.textContent = { shared: "Shared.", downloaded: "Saved to Downloads.", cancelled: "", retry: "Ready to share: tap again." }[how];
   } catch (e) {
     preparedAudio = null;
-    button.textContent = "Prepare audio";
     status.textContent = `Couldn't make the audio: ${e.message}`;
   } finally {
     button.disabled = false;

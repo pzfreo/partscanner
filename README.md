@@ -53,7 +53,7 @@ then *Add to Home screen*.
 - **Share by link** (`share.js`, `relay/`): sharing uploads the score's PDF,
   encrypted on the phone (AES-GCM), to a Cloudflare Worker + R2 relay, and
   shares just the link `https://partsong.app/#s=<id>.<key>` (WhatsApp drops a
-  message's text when a file comes with it). *Share Partsong score* in a score's
+  message's text when a file comes with it). *Share part with score* in a score's
   settings is the same link share as the icon by its title. The key is only in the #fragment, which
   browsers never send, so the relay can't read scores. Tapping the link fetches
   and decrypts it and asks before adding, the same in Safari, Chrome or the

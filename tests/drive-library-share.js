@@ -30,7 +30,7 @@ const statuses = [];
 const obs = new MutationObserver(() => statuses.push($("library-status").textContent));
 obs.observe($("library-status"), { childList: true, characterData: true, subtree: true });
 btn.click();
-await waitFor(() => /Tap share again/.test($("library-status").textContent), 30000, "retry prompt");
+await waitFor(() => /Ready to share: tap again/.test($("library-status").textContent), 30000, "retry prompt");
 btn.click();
 await waitFor(() => shared.length, 10000, "shared");
 r.statuses = [...new Set(statuses.filter(Boolean))];
