@@ -52,14 +52,15 @@ then *Add to Home screen*.
   a tap on a bar as the start. Imported MusicXML opens on As read.
 - **Share by link** (`share.js`, `relay/`): sharing uploads the score's PDF,
   encrypted on the phone (AES-GCM), to a Cloudflare Worker + R2 relay, and
-  shares a link `https://partsong.app/#s=<id>.<key>` (as the message text, and
-  inside the PDF) together with the PDF. The key is only in the #fragment, which
+  shares just the link `https://partsong.app/#s=<id>.<key>` (WhatsApp drops a
+  message's text when a file comes with it). *Share as PDF* in a score's
+  settings sends the file instead: a copy that doesn't expire. The key is only in the #fragment, which
   browsers never send, so the relay can't read scores. Tapping the link fetches
   and decrypts it and asks before adding, the same in Safari, Chrome or the
   installed app (also when Partsong is already open: `hashchange`). If the
-  upload fails, only the PDF is shared, without a link; if a link has expired
-  (a year, by the bucket's lifecycle rule) or the relay is down, the app says
-  the full score is in the PDF. `tests/drive-relay.js` (needs `wrangler dev`, see
+  upload fails, the PDF is shared instead; if a link has expired (a year, by
+  the bucket's lifecycle rule) or the relay is down, the app says so and what
+  to do. `tests/drive-relay.js` (needs `wrangler dev`, see
   its header). The relay only accepts uploads from partsong.app, up to 40 MB,
   starting with the app's marker, and never overwrites.
 - **Sharing** (`share.js`): the share icon (by the score title, or on each

@@ -1,6 +1,8 @@
 // Share from the library list, including the "tap again" path when the
 // browser refuses the share sheet because the tap was too long ago.
 // Run against http://localhost:8765/index.html.
+// These test the PDF share; with no relay reachable, sharing falls back to it.
+localStorage.setItem("partsong.relay", "http://localhost:9");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const waitFor = async (fn, ms, label) => { const end = Date.now() + ms; while (Date.now() < end) { try { const v = await fn(); if (v) return v; } catch {} await sleep(100); } throw new Error("timeout waiting for " + label); };
 const $ = (id) => document.getElementById(id);

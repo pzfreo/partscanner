@@ -52,8 +52,7 @@ export async function scoreFile(entry) {
   return pdfFile(entry, await jpegPhotos(entry));
 }
 
-// The PDF; with a link (to the relay copy), its last page leads with it.
-async function pdfFile(entry, photos, link = null) {
+async function pdfFile(entry, photos) {
   const doc = {
     format: FORMAT,
     version: 2,
@@ -70,18 +69,15 @@ async function pdfFile(entry, photos, link = null) {
     ["F2", 20, entry.title],
     ["F1", 12, `A Partsong score (${pages}) for learning your part: ${app}`],
     ["F1", 12, ""],
-    ...(link ? [["F2", 14, "Tap here to open this score in Partsong", "link"], ["F1", 12, ""], ["F1", 12, "If that doesn't work:"]] : [["F1", 12, "To practise with it in Partsong:"]]),
+    ["F1", 12, "To practise with it in Partsong:"],
     ["F1", 12, "- Partsong app installed (Android): share this file to Partsong."],
     ["F1", 12, `- Otherwise: open ${app}, tap Open file and choose this file.`],
     ["F1", 12, "  On iPhone, first save it from WhatsApp with Share, then Save to Files."],
   ];
   const note = [];
   let y = 780;
-  let linkY = null;
-  for (const [font, size, text, kind] of lines) {
-    if (kind === "link") linkY = y;
-    const line = `BT /${font} ${size} Tf 50 ${y} Td ${pdfText(text)} Tj ET`;
-    note.push(kind === "link" ? `q 0.17 0.16 0.44 rg ${line} Q` : line);
+  for (const [font, size, text] of lines) {
+    note.push(`BT /${font} ${size} Tf 50 ${y} Td ${pdfText(text)} Tj ET`);
     y -= size + 10;
   }
 
@@ -127,11 +123,9 @@ async function pdfFile(entry, photos, link = null) {
   }
   const notePage = 8 + photos.length * 3;
   const text = bytes(note.join("\n"));
-  const annots = link ? ` /Annots [${notePage + 2} 0 R]` : "";
-  obj(notePage, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents ${notePage + 1} 0 R${annots} >>`);
+  obj(notePage, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents ${notePage + 1} 0 R >>`);
   obj(notePage + 1, `<< /Length ${text.length} >>`, text);
-  if (link) obj(notePage + 2, `<< /Type /Annot /Subtype /Link /Rect [45 ${linkY - 6} 550 ${linkY + 18}] /Border [0 0 0] /A << /S /URI /URI ${pdfText(link)} >> >>`);
-  const size = notePage + (link ? 3 : 2);
+  const size = notePage + 2;
   const xref = pos;
   add(`xref\n0 ${size}\n0000000000 65535 f \n`);
   for (let n = 1; n < size; n++) add(`${String(offsets[n]).padStart(10, "0")} 00000 n \n`);
@@ -143,10 +137,11 @@ async function pdfFile(entry, photos, link = null) {
 
 // ---------- relay: share by link ----------
 // Sharing uploads the PDF, encrypted on the phone (AES-GCM), to Partsong's
-// relay (relay/); the link is <app>#s=<id>.<key>. The key is only in the
-// link's #fragment, which browsers never send, so the relay can't read scores.
+// relay (relay/), and shares just the link <app>#s=<id>.<key> (WhatsApp drops
+// a message's text when a file comes with it). The key is only in the link's
+// #fragment, which browsers never send, so the relay can't read scores.
 // Tapping the link brings the whole score to Safari, Chrome or the installed
-// app alike. If the upload fails, only the PDF is shared, without a link.
+// app alike. If the upload fails, the PDF is shared instead.
 
 const RELAY_MAGIC = "PSR1";
 const RELAY_WAIT = 60000; // ms before an upload or fetch counts as failed
@@ -172,13 +167,13 @@ async function relayFetch(path, init = {}) {
   }
 }
 
-// What a share sends: { file, link }, link null when the relay couldn't take it.
+// What a share sends: { file, link }; link null when the relay couldn't take
+// it (then the file is shared).
 export async function shareableScore(entry) {
-  const photos = await jpegPhotos(entry);
+  const file = await scoreFile(entry);
   const id = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const link = `${new URL("./", location.href).href}#s=${id}.${b64url(raw)}`;
-  const file = await pdfFile(entry, photos, link);
   try {
     const key = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt"]);
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -186,7 +181,7 @@ export async function shareableScore(entry) {
     await relayFetch(`/s/${id}`, { method: "PUT", body: new Blob([RELAY_MAGIC, iv, sealed]) });
     return { file, link };
   } catch {
-    return { file: await pdfFile(entry, photos), link: null };
+    return { file, link: null };
   }
 }
 
@@ -267,8 +262,24 @@ export const isMobile = () => navigator.userAgentData?.mobile ?? /Android|iPhone
 // even where the browser offers a share menu (e.g. Chrome on macOS).
 // "retry" means the share sheet needs a fresh tap (browsers only allow it
 // shortly after one).
-export async function shareFile(file, title, link = null) {
-  const data = { files: [file], title, ...(link && { text: `${title}: ${link}` }) };
+// A link: the share sheet on phones; on desktop, copied to paste into a message.
+export async function shareLink(link, title) {
+  const data = { title, text: `${title}: ${link}` };
+  if (isMobile() && navigator.canShare?.(data)) {
+    try {
+      await navigator.share(data);
+      return "shared";
+    } catch (e) {
+      if (e.name === "AbortError") return "cancelled";
+      if (e.name === "NotAllowedError") return "retry";
+    }
+  }
+  await navigator.clipboard.writeText(link);
+  return "copied";
+}
+
+export async function shareFile(file, title) {
+  const data = { files: [file], title };
   if (isMobile() && navigator.canShare?.(data)) {
     try {
       await navigator.share(data);

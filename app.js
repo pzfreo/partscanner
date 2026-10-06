@@ -3,7 +3,7 @@ import { Player } from "./player.js";
 import * as db from "./db.js";
 import { rotateBlob, uprightPhoto } from "./orient.js";
 import { isPdf, pdfPages } from "./pdf-pages.js";
-import { entryFromLink, entryFromRelay, isMobile, parseScoreFile, readScoreFile, scoreFile, shareableScore, shareFile } from "./share.js";
+import { entryFromLink, entryFromRelay, isMobile, parseScoreFile, readScoreFile, scoreFile, shareableScore, shareFile, shareLink } from "./share.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -773,28 +773,28 @@ async function importScore(entry) {
   openScore(entry);
 }
 
-// Shares a library score: a link (through the relay, see share.js) plus the
-// PDF, or just the PDF if the relay couldn't take it. Preparing can outlast
+// Shares a library score as a link (through the relay, see share.js), or as
+// the PDF when asked or when the relay couldn't take it. Preparing can outlast
 // the browser's "just tapped" window for the share sheet; then it's kept and
 // the next tap shares it straight away.
-let prepared = null; // { id, file, link, title }
-async function shareScore(id, button, status) {
+let prepared = null; // { id, asPdf, file, link, title }
+async function shareScore(id, button, status, asPdf = false) {
   button.disabled = true;
   try {
-    if (prepared?.id !== id) {
+    if (prepared?.id !== id || prepared.asPdf !== asPdf) {
       status.textContent = "Preparing…";
       const entry = (await db.all()).find((e) => e.id === id);
-      prepared = { id, ...(await shareableScore(entry)), title: entry.title };
+      const made = asPdf ? { file: await scoreFile(entry), link: null } : await shareableScore(entry);
+      prepared = { id, asPdf, ...made, title: entry.title };
     }
-    const how = await shareFile(prepared.file, prepared.title, prepared.link);
-    // Desktop: the PDF downloads; the link goes on the clipboard to paste.
-    if (how === "downloaded" && prepared.link) await navigator.clipboard?.writeText(prepared.link).catch(() => {});
     const linked = !!prepared.link;
-    if (how === "shared" || how === "downloaded") track("share");
+    const how = linked ? await shareLink(prepared.link, prepared.title) : await shareFile(prepared.file, prepared.title);
+    if (how === "shared" || how === "downloaded" || how === "copied") track(linked ? "share" : "share-pdf");
     if (how !== "retry") prepared = null;
     status.textContent = {
-      shared: linked ? "Shared." : "Shared as a PDF (the link service didn't respond).",
-      downloaded: linked ? "Saved to Downloads, and the link is copied." : "Saved to Downloads.",
+      shared: linked || asPdf ? "Shared." : "Shared as a PDF (the link service didn't respond).",
+      copied: "Link copied: paste it into a message.",
+      downloaded: "Saved to Downloads.",
       cancelled: "",
       retry: "Ready. Tap share again.",
     }[how];
@@ -809,6 +809,8 @@ async function shareScore(id, button, status) {
 }
 
 $("share").onclick = () => shareScore(current.id, $("share"), $("share-status"));
+// The PDF itself: a copy that keeps working after the link expires.
+$("share-pdf").onclick = () => shareScore(current.id, $("share-pdf"), $("share-pdf-status"), true);
 
 // A copy of a score (photos, music, marks, settings), unlocked and named
 // "Title (2)", added to the list (rename it when you open it), e.g. to mark up
@@ -826,7 +828,7 @@ async function copyScore(id) {
 
 // A score shared by link (#s=<id>.<key>): fetched from the relay and
 // decrypted, then offered like any other. If the relay can't supply it, say
-// where the full score is instead: the PDF that came with the link.
+// what to do: try again, or ask for it again (a link lasts a year).
 async function receiveFromRelay() {
   const fragment = location.hash.slice(1);
   history.replaceState(null, "", location.pathname);
@@ -841,8 +843,9 @@ async function receiveFromRelay() {
   if (entry) offerImport(entry);
   else
     showNotice(
-      (failure.includes("404") ? "This link has expired. " : "Couldn't fetch this score just now. ") +
-        "The full score is in the PDF that came with the link: share it to Partsong, or open it with Open file.",
+      failure.includes("404")
+        ? "This link has expired. Ask for the score to be shared again (or sent with Share as PDF, which doesn't expire)."
+        : "Couldn't fetch this score just now. Check your connection and tap the link again.",
     );
 }
 
@@ -986,6 +989,7 @@ function openScore(entry, nav = "push") {
 
   $("title").value = entry.title;
   $("share-status").textContent = "";
+  $("share-pdf-status").textContent = "";
   $("to-bar").value = score.measures.length;
   $("from-bar").value = 1;
   $("from-bar").max = $("to-bar").max = score.measures.length;

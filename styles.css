@@ -324,6 +324,8 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .share-status { margin: 0 8px; font-size: 0.85rem; }
 .share-status:empty { display: none; }
 .panel .danger { margin: 24px auto 8px; display: flex; }
+#share-pdf { margin: 28px auto 4px; display: flex; }
+#share-pdf + .muted { text-align: center; margin: 0 0 4px; font-size: 0.9rem; }
 
 details { margin-top: 24px; }
 .view-toggle { flex-direction: column; gap: 0; font-size: 0.62rem; font-weight: 600; line-height: 1.1; }

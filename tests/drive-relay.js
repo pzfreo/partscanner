@@ -17,22 +17,25 @@ let shared;
 Object.defineProperty(navigator, "userAgentData", { value: { mobile: true }, configurable: true });
 navigator.canShare = () => true;
 navigator.share = async (data) => { shared = data; };
-const share = async () => {
+const share = async (button = "share", statusId = "share-status") => {
   shared = null;
   $("new-scan").click(); history.back(); await sleep(400);
   await waitFor(() => document.querySelector('#library li[data-id="rel-1"] button'), 5000, "library").then((b) => b.click());
   await sleep(500);
   $("settings").click(); await sleep(300);
-  $("share").click();
+  $(button).click();
   await waitFor(() => shared, 90000, "share");
-  return { status: await waitFor(() => $("share-status").textContent, 5000, "status"), shared };
+  return { status: await waitFor(() => $(statusId).textContent, 5000, "status"), shared };
 };
 const pdfHasLink = async (file) => (await file.text()).includes("/URI");
 
-// 1. Relay up: link in the text, and inside the PDF.
+// 1. Relay up: just the link (WhatsApp drops text that comes with a file).
 let s = await share();
 const link = s.shared.text?.match(/https?:\S+#s=\S+/)?.[0];
-r.relayUp = { status: s.status, text: s.shared.text?.replace(/#s=\S+/, "#s=…"), file: s.shared.files[0].name, pdfHasLink: await pdfHasLink(s.shared.files[0]) };
+r.relayUp = { status: s.status, text: s.shared.text?.replace(/#s=\S+/, "#s=…"), files: s.shared.files?.length ?? 0 };
+// Share as PDF: the file, no link anywhere.
+s = await share("share-pdf", "share-pdf-status");
+r.asPdf = { status: s.status, text: s.shared.text ?? null, file: s.shared.files[0].name, pdfHasLink: await pdfHasLink(s.shared.files[0]) };
 
 // 2. The link opened elsewhere: the whole score is offered and added.
 const frame = (src) => { const f = document.createElement("iframe"); f.src = src; document.body.append(f); return f; };
@@ -56,7 +59,7 @@ r.whileOpenOffer = await offerIn(f, "offer while open");
 f = frame(link.replace(/#s=[\w-]{22}/, "#s=ZZZZZZZZZZZZZZZZZZZZZZ"));
 r.expiredNotice = await offerIn(f, "expired notice");
 
-// 5. Relay down when sharing: just the PDF, no link anywhere.
+// 5. Relay down when sharing: the PDF instead, no link anywhere.
 localStorage.setItem("partsong.relay", "http://localhost:9");
 s = await share();
 r.relayDown = { status: s.status, text: s.shared.text ?? null, file: s.shared.files[0].name, pdfHasLink: await pdfHasLink(s.shared.files[0]) };
