@@ -779,25 +779,24 @@ async function importScore(entry) {
 }
 
 // Shares a library score as a link (through the relay, see share.js), or as
-// the PDF when asked or when the relay couldn't take it. Preparing can outlast
+// the PDF when the relay couldn't take it. Preparing can outlast
 // the browser's "just tapped" window for the share sheet; then it's kept and
 // the next tap shares it straight away.
-let prepared = null; // { id, asPdf, file, link, title }
-async function shareScore(id, button, status, asPdf = false) {
+let prepared = null; // { id, file, link, title }
+async function shareScore(id, button, status) {
   button.disabled = true;
   try {
-    if (prepared?.id !== id || prepared.asPdf !== asPdf) {
+    if (prepared?.id !== id) {
       status.textContent = "Preparing…";
       const entry = (await db.all()).find((e) => e.id === id);
-      const made = asPdf ? { file: await scoreFile(entry), link: null } : await shareableScore(entry);
-      prepared = { id, asPdf, ...made, title: entry.title };
+      prepared = { id, ...(await shareableScore(entry)), title: entry.title };
     }
     const linked = !!prepared.link;
     const how = linked ? await shareLink(prepared.link, prepared.title) : await shareFile(prepared.file, prepared.title);
     if (how === "shared" || how === "downloaded" || how === "copied") track(linked ? "share" : "share-pdf");
     if (how !== "retry") prepared = null;
     status.textContent = {
-      shared: linked || asPdf ? "Shared." : "Shared as a PDF (the link service didn't respond).",
+      shared: linked ? "Shared." : "Shared as a PDF (the link service didn't respond).",
       copied: "Link copied: paste it into a message.",
       downloaded: "Saved to Downloads.",
       cancelled: "",
@@ -861,8 +860,8 @@ $("share-audio").onclick = async () => {
   }
 };
 
-// The PDF itself: a copy that keeps working after the link expires.
-$("share-pdf").onclick = () => shareScore(current.id, $("share-pdf"), $("share-pdf-status"), true);
+// The same link share as the icon by the title.
+$("share-score").onclick = () => shareScore(current.id, $("share-score"), $("share-score-status"));
 
 // A copy of a score (photos, music, marks, settings), unlocked and named
 // "Title (2)", added to the list (rename it when you open it), e.g. to mark up
@@ -896,7 +895,7 @@ async function receiveFromRelay() {
   else
     showNotice(
       failure.includes("404")
-        ? "This link has expired. Ask for the score to be shared again (or sent with Share Partsong score, which doesn't expire)."
+        ? "This link has expired (links last a year). Ask for the score to be shared again."
         : "Couldn't fetch this score just now. Check your connection and tap the link again.",
     );
 }
@@ -1041,7 +1040,7 @@ function openScore(entry, nav = "push") {
 
   $("title").value = entry.title;
   $("share-status").textContent = "";
-  $("share-pdf-status").textContent = "";
+  $("share-score-status").textContent = "";
   $("share-audio-status").textContent = "";
   $("to-bar").value = score.measures.length;
   $("from-bar").value = 1;

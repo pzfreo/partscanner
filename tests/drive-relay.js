@@ -33,9 +33,9 @@ const pdfHasLink = async (file) => (await file.text()).includes("/URI");
 let s = await share();
 const link = s.shared.text?.match(/https?:\S+#s=\S+/)?.[0];
 r.relayUp = { status: s.status, text: s.shared.text?.replace(/#s=\S+/, "#s=…"), files: s.shared.files?.length ?? 0 };
-// Share as PDF: the file, no link anywhere.
-s = await share("share-pdf", "share-pdf-status");
-r.asPdf = { status: s.status, text: s.shared.text ?? null, file: s.shared.files[0].name, pdfHasLink: await pdfHasLink(s.shared.files[0]) };
+// Share Partsong score in settings: the same link share.
+s = await share("share-score", "share-score-status");
+r.settingsButton = { status: s.status, isLink: /#s=/.test(s.shared.text ?? ""), files: s.shared.files?.length ?? 0 };
 
 // 2. The link opened elsewhere: the whole score is offered and added.
 const frame = (src) => { const f = document.createElement("iframe"); f.src = src; document.body.append(f); return f; };

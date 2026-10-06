@@ -54,7 +54,7 @@ then *Add to Home screen*.
   encrypted on the phone (AES-GCM), to a Cloudflare Worker + R2 relay, and
   shares just the link `https://partsong.app/#s=<id>.<key>` (WhatsApp drops a
   message's text when a file comes with it). *Share Partsong score* in a score's
-  settings sends the file instead: a copy that doesn't expire. The key is only in the #fragment, which
+  settings is the same link share as the icon by its title. The key is only in the #fragment, which
   browsers never send, so the relay can't read scores. Tapping the link fetches
   and decrypts it and asks before adding, the same in Safari, Chrome or the
   installed app (also when Partsong is already open: `hashchange`). If the
