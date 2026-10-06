@@ -742,7 +742,11 @@ async function openFiles(files) {
         continue;
       }
       const text = await f.text();
-      parsePage(text); // throws if it isn't MusicXML
+      try {
+        parsePage(text);
+      } catch {
+        throw new Error(`${f.name || "it"} isn't a Partsong score, a PDF or a MusicXML file`);
+      }
       xmls.push(text);
       name ||= f.name.replace(/\.(musicxml|xml)$/i, "");
     }

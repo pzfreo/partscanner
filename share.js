@@ -229,8 +229,8 @@ async function readPdfScore(file) {
 // A library entry from any score file (.partsong.pdf, or an older
 // .partsong.html), or null if the file isn't one.
 export async function readScoreFile(file) {
-  const head = new TextDecoder().decode(await file.slice(0, 5).arrayBuffer());
-  if (head === "%PDF-") return readPdfScore(file);
+  const head = new TextDecoder("latin1").decode(await file.slice(0, 1024).arrayBuffer());
+  if (head.includes("%PDF-")) return readPdfScore(file); // may start up to 1 KB in
   return parseScoreFile(await file.text());
 }
 

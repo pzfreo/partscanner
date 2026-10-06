@@ -16,9 +16,10 @@ function load() {
 }
 
 // By content: pickers (e.g. Drive on Android) may give no type or extension.
+// The PDF standard allows the %PDF- header anywhere in the first 1024 bytes.
 export async function isPdf(file) {
-  const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
-  return String.fromCharCode(...head) === "%PDF-";
+  const head = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+  return String.fromCharCode(...head).includes("%PDF-");
 }
 
 // Calls onPage(blob, pageNumber, pageCount) for each page, in order.
