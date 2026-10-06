@@ -184,6 +184,7 @@ async function init() {
   ort.env.wasm.numThreads = self.crossOriginIsolated
     ? Math.min(4, navigator.hardwareConcurrency || 1)
     : 1;
+  post({ type: "log", msg: `WASM threads: ${ort.env.wasm.numThreads}` });
   const { loadPyodide } = await import(PYODIDE_URL + "pyodide.mjs");
   useGpu = !!(self.navigator.gpu && (await navigator.gpu.requestAdapter()));
 

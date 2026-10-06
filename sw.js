@@ -34,6 +34,20 @@ self.addEventListener("install", (e) => {
 });
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
+// GitHub Pages can't send headers, so the worker adds the two that make the
+// app cross-origin isolated, which lets the music reader's WASM use several
+// threads (the decoder is ~60% of a page's time). credentialless keeps the CDN
+// libraries and analytics loading without CORP headers. Applies from the first
+// load the worker controls.
+function isolated(res) {
+  if (!res || res.type === "opaqueredirect" || !res.status) return res;
+  const headers = new Headers(res.headers);
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+  const body = [101, 103, 204, 205, 304].includes(res.status) ? null : res.body; // no-body statuses
+  return new Response(body, { status: res.status, statusText: res.statusText, headers });
+}
+
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   // Android share sheet -> installed app (manifest share_target): stash the
@@ -93,7 +107,9 @@ self.addEventListener("fetch", (e) => {
           if (hit) slowUntil = Date.now() + 30000;
           return hit || fresh;
         }),
-      ]).then((res) => res || fresh),
+      ])
+        .then((res) => res || fresh)
+        .then(isolated),
     );
     e.waitUntil(fresh.catch(() => {}));
   }

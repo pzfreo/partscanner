@@ -37,6 +37,43 @@ def _build_image_position_and_voice(xml, symbol):
 
 music_xml_generator.build_image_position = _build_image_position_and_voice
 
+# homr merges overlapping shapes by testing every pair of groups (O(n^2), about
+# 2 s of Python per page in Pyodide). Two shapes can only touch if their
+# centres are within the sum of their major axes horizontally (homr's own
+# _can_shapes_possibly_touch), so sort groups by that x-extent and only test
+# pairs whose extents overlap. Same groups, same order.
+from homr import bounding_boxes  # noqa: E402
+
+
+def _x_extent(group):
+    lo, hi = float("inf"), float("-inf")
+    for box in group:
+        (cx, _), axes, _ = box.rotated_box if isinstance(box, bounding_boxes.BoundingBox) else box.box
+        r = max(axes)
+        lo, hi = min(lo, cx - r), max(hi, cx + r)
+    return lo, hi
+
+
+def _merge_groups_swept(groups):
+    n = len(groups)
+    uf = bounding_boxes.UnionFind(n)
+    extents = [_x_extent(g) for g in groups]
+    order = sorted(range(n), key=lambda i: extents[i][0])
+    for a, i in enumerate(order):
+        hi = extents[i][1]
+        for j in order[a + 1 :]:
+            if extents[j][0] > hi:
+                break
+            if bounding_boxes._do_groups_overlap(groups[min(i, j)], groups[max(i, j)]):
+                uf.union(min(i, j), max(i, j))
+    merged = {}
+    for i in range(n):
+        merged.setdefault(uf.find(i), []).extend(groups[i])
+    return list(merged.values())
+
+
+bounding_boxes._merge_groups_optimized = _merge_groups_swept
+
 # Skip writing the preview PNG; the app shows the original photo instead.
 Debug.write_teaser = lambda *args, **kwargs: None
 
@@ -57,3 +94,17 @@ def recognise(image_path):
     xml_path = process_image(image_path, _CONFIG, XmlGeneratorArguments())
     with open(xml_path, encoding="utf-8") as f:
         return f.read()
+
+
+def recognise_profiled(image_path):  # TEMPORARY profiling
+    import cProfile, io, pstats
+    pr = cProfile.Profile()
+    pr.enable()
+    out = recognise(image_path)
+    pr.disable()
+    s = io.StringIO()
+    st = pstats.Stats(pr, stream=s)
+    st.sort_stats("cumtime").print_callers("is_overlapping|_can_shapes_possibly_touch")
+    st.sort_stats("cumtime").print_stats(30)
+    print(s.getvalue())
+    return out

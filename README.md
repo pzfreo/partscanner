@@ -19,6 +19,15 @@ then *Add to Home screen*.
   encoder models when available, WASM for the decoder). Python blocks on those
   calls via JSPI, so it needs **Chrome/Edge 137+** (current Chrome on Android
   is fine).
+- **Recognition speed** (one page, huron_1, desktop Chrome): 12.1 s → 7.4 s,
+  same MusicXML. The decoder's key/value cache stays on the JS side between
+  its ~340 steps instead of being copied to Python and back (`omr-worker.js`
+  `run`/`keep`); the service worker adds COOP/COEP (`credentialless`) headers,
+  which GitHub Pages can't, so the app is cross-origin isolated and the WASM
+  decoder runs on 4 threads; `omr/runner.py` sweeps homr's pairwise shape merge
+  by x-extent. The worker logs each page's time per model and in Python.
+  Measured and rejected: the decoder is already int8-quantized, and batching
+  staves changes results (its dynamic quantization scale spans the batch).
 - **Models**: ~157 MB, downloaded once on first scan and kept in Cache Storage,
   in 4 MB pieces (HTTP range requests) so a dropped connection resumes rather
   than restarting; a stalled piece is retried.
