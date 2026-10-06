@@ -175,20 +175,20 @@
           <span class="grab" aria-hidden="true"></span>
           <button id="panel-close" class="panel-close">Done</button>
         </div>
-        <div class="audio-share">
+        <h2>Share <button class="q" aria-controls="share-help" aria-expanded="false" aria-label="About sharing">?</button></h2>
+        <p id="share-help" class="hint" hidden>Audio: what Play plays, as set below (turn Other parts to 0 for your part alone). PDF: the pages with the music inside; unlike a link, it doesn't expire.</p>
+        <div class="row2">
           <button id="share-audio">Prepare audio</button>
-          <p class="muted">An audio file of what Play plays: these bars, your part, the others at their volume, this sound and tempo. Turn the others down to 0 for your part alone.</p>
-          <p id="share-audio-status" class="muted share-status" aria-live="polite"></p>
+          <button id="share-pdf">Share as PDF</button>
         </div>
-        <label class="lock-row">
-          <input type="checkbox" id="lock">
-          <span><strong>Lock this score</strong><br><span class="muted">Stops changes to your part, the title and Delete.</span></span>
-        </label>
+        <p id="share-audio-status" class="muted share-status" aria-live="polite"></p>
+        <p id="share-pdf-status" class="muted share-status" aria-live="polite"></p>
 
-        <h2>Your part</h2>
+        <h2>Your part <button class="q" aria-controls="part-help" aria-expanded="false" aria-label="About choosing your part">?</button></h2>
+        <p id="part-help" class="hint" hidden>Marking works for any score: tap the staff you sing in each system. Picking from the list is quicker if your part stays on the same staff throughout.</p>
         <div id="auto-part">
           <button id="start-markup">Mark your part on the music</button>
-          <p class="muted">Or pick it from the list (fine when each part keeps the same staff throughout):</p>
+          <p class="hint">Or pick it:</p>
           <ul id="lines" class="lines"></ul>
         </div>
         <div id="marked-part" class="marked-part" hidden>
@@ -231,10 +231,14 @@
           </div>
         </div>
 
-        <button id="share-pdf">Share as PDF</button>
-        <p class="muted">A file of the pages with the music inside: it keeps working after a shared link expires (a year). Open it with Partsong's Open file, or share it to the Partsong app.</p>
-        <p id="share-pdf-status" class="muted share-status" aria-live="polite"></p>
-        <button id="delete" class="danger">Delete score</button>
+        <div class="bottom">
+          <div class="lock-box">
+            <label class="check"><input type="checkbox" id="lock"> <strong>Lock</strong></label>
+            <button class="q" aria-controls="lock-help" aria-expanded="false" aria-label="About locking">?</button>
+          </div>
+          <button id="delete" class="danger">Delete</button>
+        </div>
+        <p id="lock-help" class="hint" hidden>Locked: your part, the title and Delete can't be changed by accident.</p>
         <p class="report-link"><button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
       </div>
 

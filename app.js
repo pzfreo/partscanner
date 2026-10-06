@@ -1575,6 +1575,14 @@ function setPanel(open, nav = true) {
   else if (history.state?.panel) history.back();
 }
 $("settings").onclick = () => setPanel($("panel").hidden);
+// "?" buttons show and hide the explanation they point at.
+for (const q of document.querySelectorAll(".q")) {
+  q.onclick = () => {
+    const help = $(q.getAttribute("aria-controls"));
+    help.hidden = !help.hidden;
+    q.setAttribute("aria-expanded", String(!help.hidden));
+  };
+}
 // A change to anything that's heard means the audio needs preparing again.
 for (const type of ["input", "change"]) $("panel").addEventListener(type, () => current && updateAudioButton());
 $("panel-close").onclick = () => setPanel(false);
@@ -1648,12 +1656,12 @@ $("delete").onclick = () => {
     $("delete").textContent = "Tap again to delete";
     setTimeout(() => {
       $("delete").dataset.confirm = "";
-      $("delete").textContent = "Delete score";
+      $("delete").textContent = "Delete";
     }, 3000);
     return;
   }
   $("delete").dataset.confirm = "";
-  $("delete").textContent = "Delete score";
+  $("delete").textContent = "Delete";
   db.remove(current.id).finally(goHome);
 };
 
