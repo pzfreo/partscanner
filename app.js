@@ -621,6 +621,7 @@ async function addFiles(files) {
     }
   }
   setPageStatus(problems.join("\n"));
+  return !problems.length;
 }
 
 $("camera").onchange = (e) => {
@@ -758,9 +759,10 @@ async function openFiles(files) {
       xmls.push(text);
       name ||= f.name.replace(/\.(musicxml|xml)$/i, "");
     }
+    // An ordinary PDF is sheet music to read: start at once.
     if (pdfs.length) {
       loadScan();
-      await addFiles(pdfs);
+      if ((await addFiles(pdfs)) && pages.length) readScan();
     }
     if (!xmls.length) return;
     const title = parsePage(xmls[0]).title || name || "Imported score";

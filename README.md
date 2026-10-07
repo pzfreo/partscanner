@@ -76,13 +76,13 @@ then *Add to Home screen*.
   deflated), and a last page saying how to open it in Partsong. It goes to the
   share sheet (WhatsApp, Drive, email) or downloads; browsers only share a few
   file types, and PDF is the one that's readable everywhere and sent unchanged.
-  *Open file* imports it (an ordinary PDF there starts a new scan). Imports never
+  *Open PDF* imports it (an ordinary PDF there is read as a new scan). Imports never
   overwrite: if the score or its name is already in the library, it's added as
   "Title (2)" etc. The installed app is also a share target (manifest
   `share_target` → service worker inbox): shared score files are offered (and
   wait in the inbox until answered, since Android can launch the app twice),
   shared PDFs/photos start a new scan. Older `.partsong.html` files still open:
-  via *Open file*, sharing, or their page's button (which posts the full score
+  via *Open PDF*, sharing, or their page's button (which posts the full score
   to the app); their link alone can't carry photos, so a score with photos isn't
   added that way and the app says to share the file to Partsong instead.
   Partsong is also registered to open PDFs (manifest `file_handlers` +
