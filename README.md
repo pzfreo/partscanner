@@ -76,6 +76,9 @@ then *Add to Home screen*.
   deflated), and a last page saying how to open it in Partsong. It goes to the
   share sheet (WhatsApp, Drive, email) or downloads; browsers only share a few
   file types, and PDF is the one that's readable everywhere and sent unchanged.
+  Shares now normally go as a link (the PDF only when the relay can't take it);
+  *Export PDF* in a score's settings saves or sends the PDF itself, a copy that
+  doesn't expire (`tests/drive-export-pdf.js`).
   *Open PDF* imports it (an ordinary PDF there is read as a new scan). Imports never
   overwrite: if the score or its name is already in the library, it's added as
   "Title (2)" etc. The installed app is also a share target (manifest

@@ -930,6 +930,35 @@ $("share-audio").onclick = async () => {
 // The same link share as the icon by the title.
 $("share-score").onclick = () => shareScore(current.id, $("share-score"), null, "Share part with score");
 
+// The score as a .partsong.pdf (pages, with the score inside): a copy to keep,
+// print or send that doesn't expire. Kept while unchanged if the share sheet
+// needs a fresh tap.
+let preparedPdf = null; // { key, file }
+$("export-pdf").onclick = async () => {
+  const button = $("export-pdf");
+  const say = shareReporter(button, null, "Export PDF");
+  button.disabled = true;
+  try {
+    const entry = liveEntry((await db.all()).find((e) => e.id === current.id));
+    const key = `${entry.id} ${await shareKey(entry)}`;
+    if (preparedPdf?.key !== key) {
+      say("busy", "", "Preparing…");
+      preparedPdf = { key, file: await scoreFile(entry) };
+    }
+    const how = await shareFile(preparedPdf.file, entry.title);
+    if (how === "shared" || how === "downloaded") track("export-pdf");
+    if (how !== "retry") preparedPdf = null;
+    if (how === "retry") say("ready", "", "Ready: tap again");
+    else if (how === "cancelled") say("idle", "");
+    else say("done", "", how === "downloaded" ? "Saved ✓" : "Done ✓");
+  } catch (e) {
+    preparedPdf = null;
+    say("error", `Couldn't make the PDF: ${e.message}`);
+  } finally {
+    button.disabled = false;
+  }
+};
+
 // A copy of a score (photos, music, marks, settings), unlocked and named
 // "Title (2)", added to the list (rename it when you open it), e.g. to mark up
 // first and second sopranos as separate scores.
@@ -1107,7 +1136,7 @@ function openScore(entry, nav = "push") {
 
   $("title").value = entry.title;
   $("share-status").textContent = "";
-  for (const [id, label] of [["share-audio", "Share audio"], ["share-score", "Share part with score"]]) {
+  for (const [id, label] of [["share-audio", "Share audio"], ["share-score", "Share part with score"], ["export-pdf", "Export PDF"]]) {
     clearTimeout($(id).revert);
     $(id).textContent = label;
   }
