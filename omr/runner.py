@@ -101,7 +101,7 @@ bounding_boxes._merge_groups_optimized = _merge_groups_swept
 # is missing from a run empty bars there, so every part keeps the same bars.
 from homr import main as homr_main, staff_parsing  # noqa: E402
 from homr.staff_regions import StaffRegions  # noqa: E402
-from homr.transformer.vocabulary import EncodedSymbol, remove_duplicated_symbols  # noqa: E402
+from homr.transformer.vocabulary import EncodedSymbol, empty, remove_duplicated_symbols  # noqa: E402
 
 _parse_staffs = staff_parsing.parse_staffs
 
@@ -174,7 +174,97 @@ def _parse_staffs_by_layout(debug, staffs, image, config, selected_staff=-1, pag
     return [remove_duplicated_symbols(parts[key]) for key in order]
 
 
-homr_main.parse_staffs = _parse_staffs_by_layout
+def _apply_key(symbols, start, end, key):
+    """Each note's lift is its sounding accidental, which the model works out
+    from the key it believes it's in. Where it believed the wrong key, apply
+    the right one to notes with no accidental."""
+    fifths = int(key.split("_")[1])
+    steps = "FCGDAEB"[:fifths] if fifths > 0 else "BEADGCF"[: -fifths]
+    for i in range(start, end):
+        s = symbols[i]
+        if s.rhythm.startswith("keySignature"):
+            break
+        if s.rhythm.startswith("note") and s.lift == empty and s.pitch[:1] in steps:
+            symbols[i] = s.change_lift("#" if fifths > 0 else "b")
+
+
+def _drop_false_key_changes(symbols):
+    """The model can misread a time signature partway along a line as a key
+    change (e.g. to no sharps). A real change carries on into the next line's
+    key signature, so drop one where the next line goes back to the old key."""
+    rows, row = [], []
+    for s in symbols:
+        row.append(s)
+        if s.rhythm == "newline":
+            rows.append(row)
+            row = []
+    rows.append(row)
+
+    def header_key(r):
+        for s in r:
+            if s.rhythm.startswith(("note", "rest")) or "barline" in s.rhythm:
+                return None
+            if s.rhythm.startswith("keySignature"):
+                return s.rhythm
+        return None
+
+    key = None
+    for n, r in enumerate(rows):
+        key = header_key(r) or key
+        in_header = True
+        for s in list(r):
+            if s.rhythm.startswith(("note", "rest")) or "barline" in s.rhythm:
+                in_header = False
+            elif s.rhythm.startswith("keySignature") and not in_header and s.rhythm != key:
+                later = [x.rhythm for x in r[r.index(s) + 1 :] if x.rhythm.startswith("keySignature")]
+                if key and not later and n + 1 < len(rows) and header_key(rows[n + 1]) == key:
+                    at = r.index(s)
+                    r.remove(s)
+                    _apply_key(r, at, len(r), key)
+                    continue
+                key = s.rhythm
+    return [s for r in rows for s in r]
+
+
+def _key_at(symbols, bar):
+    """The key signature in force at the given bar, if any."""
+    key = None
+    for i, s in enumerate(symbols):
+        if s.rhythm.startswith("keySignature"):
+            if _bar_count(symbols[:i]) > bar:
+                break
+            key = s
+    return key
+
+
+def _add_missing_keys(voices):
+    """The model can miss a staff's key signature (e.g. on a part that only
+    starts partway down the page). A part with no key before its first note
+    gets the key the other parts are in at that bar."""
+    for voice in voices:
+        first = next((i for i, s in enumerate(voice) if s.rhythm.startswith(("note", "rest"))), None)
+        if first is None or any(s.rhythm.startswith("keySignature") for s in voice[:first]):
+            continue
+        bar = _bar_count(voice[:first])
+        key = next((k for other in voices if other is not voice and (k := _key_at(other, bar))), None)
+        if key is not None:
+            at = first
+            while at > 0 and voice[at - 1].rhythm.startswith(("clef", "timeSignature", "chord")):
+                at -= 1
+            # After the clef, before the time signature, as the model writes them.
+            while voice[at].rhythm.startswith(("clef", "chord")):
+                at += 1
+            voice.insert(at, EncodedSymbol(key.rhythm))
+            _apply_key(voice, at + 1, len(voice), key.rhythm)
+    return voices
+
+
+def _parse_staffs_fixed(*args, **kwargs):
+    voices = [_drop_false_key_changes(voice) for voice in _parse_staffs_by_layout(*args, **kwargs)]
+    return _add_missing_keys(voices)
+
+
+homr_main.parse_staffs = _parse_staffs_fixed
 
 # Skip writing the preview PNG; the app shows the original photo instead.
 Debug.write_teaser = lambda *args, **kwargs: None
