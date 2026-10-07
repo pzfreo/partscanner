@@ -37,6 +37,26 @@ def _build_image_position_and_voice(xml, symbol):
 
 music_xml_generator.build_image_position = _build_image_position_and_voice
 
+# The model sometimes predicts a grace note with no pitch. homr's writer treats
+# that as a zero-length rest and fails an assertion, losing the whole page. A
+# rest that takes no time means nothing, so drop it before writing the chord.
+_build_note_chord = music_xml_generator.build_note_chord
+_no_pitch = (music_xml_generator.empty, music_xml_generator.nonote)
+
+
+def _build_note_chord_without_zero_rests(note_chord, state, chord_duration):
+    groups = music_xml_generator._group_notes(note_chord.symbols)
+    zero_rests = [s for s in groups.get(0, []) if s.pitch in _no_pitch]
+    if zero_rests:
+        kept = [s for s in note_chord.symbols if s not in zero_rests]
+        if not kept:
+            return []
+        note_chord = music_xml_generator.SymbolChord(kept, note_chord.tuplet_mark)
+    return _build_note_chord(note_chord, state, chord_duration)
+
+
+music_xml_generator.build_note_chord = _build_note_chord_without_zero_rests
+
 # homr merges overlapping shapes by testing every pair of groups (O(n^2), about
 # 2 s of Python per page in Pyodide). Two shapes can only touch if their
 # centres are within the sum of their major axes horizontally (homr's own
