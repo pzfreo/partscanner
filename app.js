@@ -1418,7 +1418,7 @@ function renderMarks() {
     for (const [sysIndex, lineId] of Object.entries(current.manual)) {
       const sys = score.systems[sysIndex];
       const line = score.lines[lineId];
-      const staff = sys?.page === p && sys.staves.find((st) => st.key === line?.staffKey);
+      const staff = sys?.page === p && sys.staves.find((st) => st.lines.includes(Number(lineId)));
       if (!staff) continue;
       const px = view.w * 0.015;
       const py = view.h * 0.012;

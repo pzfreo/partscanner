@@ -173,7 +173,7 @@ function splitStaff(notes) {
   if (notes.length && notes.every((n) => n.tag)) {
     const second = notes.filter((n) => n.tag.endsWith("2"));
     const first = notes.filter((n) => !n.tag.endsWith("2"));
-    if (!second.length) return { high: pickFromChords(first, true), low: pickFromChords(first, false) };
+    if (!second.length && !notes.some((n) => n.staffKey)) return { high: pickFromChords(first, true), low: pickFromChords(first, false) };
     return { high: pickFromChords(first, true), low: pickFromChords(second, false) };
   }
   return splitByPitch(notes);
@@ -253,6 +253,36 @@ function mergeTies(notes) {
 
 const sameLine = (a, b) =>
   a.length === b.length && a.every((n, i) => n.t === b[i].t && n.midi === b[i].midi && n.dur === b[i].dur);
+
+// A choir written on two staves (SA, TB) may switch to four staves, one per
+// voice, partway down a page; the reader then gives those staves as four new
+// parts. Fold them back into the choir's empty bars, voice by voice, keeping
+// each voice's own staff for marking.
+function foldSplitChoir(page) {
+  const choir = page.parts.filter((p) => p.staves === 2);
+  const voices = page.parts.filter((p) => p.staves === 1);
+  if (choir.length !== 1 || voices.length !== 4) return;
+  const sung = (part, i) => part.measures[i]?.notes.some((n) => n.midi != null);
+  const bars = Math.max(...page.parts.map((p) => p.measures.length));
+  const split = [...Array(bars).keys()].filter((i) => voices.some((v) => sung(v, i)));
+  if (!split.length || split.some((i) => sung(choir[0], i)) || !voices.every((v) => split.some((i) => sung(v, i)))) return;
+  const [part] = choir;
+  for (const i of split) {
+    const notes = voices.flatMap((v, k) =>
+      (v.measures[i]?.notes ?? []).map((n) => ({
+        ...n,
+        // A tenor in treble clef is the octave-lower treble clef (see below).
+        midi: k === 2 && v.clef === "G" && n.midi != null ? n.midi - 12 : n.midi,
+        staff: k < 2 ? 1 : 2,
+        tag: k % 2 ? "upper2" : "upper",
+        staffKey: `split${k}`,
+      })),
+    );
+    const length = Math.max(...voices.map((v) => v.measures[i]?.length ?? 0));
+    part.measures[i] = { ...(voices.find((v) => v.measures[i])?.measures[i] ?? {}), ...part.measures[i], notes, length };
+  }
+  page.parts = page.parts.filter((p) => !voices.includes(p));
+}
 
 const barX0 = (m) => {
   const xs = m.notes.filter((n) => n.pos).map((n) => n.pos.x);
@@ -351,6 +381,7 @@ export function playOrder(measures, from, to, targets = {}) {
 // pages: array of parsePage() results, in page order.
 export function buildScore(pages) {
   pages.forEach(alignBars);
+  pages.forEach(foldSplitChoir);
   // Match parts across pages by staff layout: the k-th 2-staff part on each
   // page is the same part, etc. Pages may lack a part (e.g. a solo line).
   const partInfo = new Map();
@@ -443,6 +474,7 @@ export function buildScore(pages) {
             tieStart: n.tieStart,
             tieStop: n.tieStop,
             pos: n.pos && { page: p, ...n.pos },
+            staffKey: n.staffKey,
           });
           high.push(...split.high.map(place));
           low.push(...split.low.map(place));
@@ -518,11 +550,12 @@ function findSystems(measures, lines) {
     for (const line of lines) {
       for (const n of line.notes) {
         if (n.t < sys.start || n.t >= sys.end || n.pos?.page !== sys.page) continue;
-        const st = staves.get(line.staffKey) ?? { key: line.staffKey, y0: Infinity, y1: -Infinity, lines: new Set() };
+        const key = n.staffKey ?? line.staffKey;
+        const st = staves.get(key) ?? { key, y0: Infinity, y1: -Infinity, lines: new Set() };
         st.y0 = Math.min(st.y0, n.pos.y);
         st.y1 = Math.max(st.y1, n.pos.y);
         st.lines.add(line.id);
-        staves.set(line.staffKey, st);
+        staves.set(key, st);
       }
     }
     sys.staves = [...staves.values()].map((st) => ({ ...st, lines: [...st.lines] })).sort((a, b) => a.y0 - b.y0);

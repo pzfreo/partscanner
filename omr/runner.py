@@ -176,15 +176,15 @@ def _parse_staffs_by_layout(debug, staffs, image, config, selected_staff=-1, pag
 
 def _apply_key(symbols, start, end, key):
     """Each note's lift is its sounding accidental, which the model works out
-    from the key it believes it's in. Where it believed the wrong key, apply
-    the right one to notes with no accidental."""
+    from the key it believes it's in (a key it misread partway along a line).
+    Apply the right key to notes with no accidental."""
     fifths = int(key.split("_")[1])
     steps = "FCGDAEB"[:fifths] if fifths > 0 else "BEADGCF"[: -fifths]
     for i in range(start, end):
         s = symbols[i]
         if s.rhythm.startswith("keySignature"):
             break
-        if s.rhythm.startswith("note") and s.lift == empty and s.pitch[:1] in steps:
+        if s.rhythm.startswith("note") and s.lift in _no_pitch and s.pitch[:1] in steps:
             symbols[i] = s.change_lift("#" if fifths > 0 else "b")
 
 
@@ -226,42 +226,8 @@ def _drop_false_key_changes(symbols):
     return [s for r in rows for s in r]
 
 
-def _key_at(symbols, bar):
-    """The key signature in force at the given bar, if any."""
-    key = None
-    for i, s in enumerate(symbols):
-        if s.rhythm.startswith("keySignature"):
-            if _bar_count(symbols[:i]) > bar:
-                break
-            key = s
-    return key
-
-
-def _add_missing_keys(voices):
-    """The model can miss a staff's key signature (e.g. on a part that only
-    starts partway down the page). A part with no key before its first note
-    gets the key the other parts are in at that bar."""
-    for voice in voices:
-        first = next((i for i, s in enumerate(voice) if s.rhythm.startswith(("note", "rest"))), None)
-        if first is None or any(s.rhythm.startswith("keySignature") for s in voice[:first]):
-            continue
-        bar = _bar_count(voice[:first])
-        key = next((k for other in voices if other is not voice and (k := _key_at(other, bar))), None)
-        if key is not None:
-            at = first
-            while at > 0 and voice[at - 1].rhythm.startswith(("clef", "timeSignature", "chord")):
-                at -= 1
-            # After the clef, before the time signature, as the model writes them.
-            while voice[at].rhythm.startswith(("clef", "chord")):
-                at += 1
-            voice.insert(at, EncodedSymbol(key.rhythm))
-            _apply_key(voice, at + 1, len(voice), key.rhythm)
-    return voices
-
-
 def _parse_staffs_fixed(*args, **kwargs):
-    voices = [_drop_false_key_changes(voice) for voice in _parse_staffs_by_layout(*args, **kwargs)]
-    return _add_missing_keys(voices)
+    return [_drop_false_key_changes(voice) for voice in _parse_staffs_by_layout(*args, **kwargs)]
 
 
 homr_main.parse_staffs = _parse_staffs_fixed
