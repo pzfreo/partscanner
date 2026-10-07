@@ -702,7 +702,11 @@ async function readScan() {
   } catch (e) {
     pageLabel = "";
     track("read-failed");
-    setPageStatus(`Couldn't read page ${pages.findIndex((p) => !p.xml) + 1}: ${e.message}`);
+    // A Python traceback ends with the actual error; show that first, since
+    // the full trace runs off the bottom of a phone screen.
+    const lines = e.message.trim().split("\n");
+    const why = lines.length > 1 ? `${lines.at(-1)}\n\n${e.message}` : e.message;
+    setPageStatus(`Couldn't read page ${pages.findIndex((p) => !p.xml) + 1}: ${why}`);
     $("recognise").disabled = false;
     return;
   } finally {
