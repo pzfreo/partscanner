@@ -373,7 +373,9 @@ export function buildScore(pages) {
     pageMeasureStart.push(measures.length);
     const count = Math.max(0, ...page.parts.map((p) => p.measures.length));
     for (let i = 0; i < count; i++) {
-      const length = Math.max(...page.parts.map((p) => p.measures[i]?.length ?? 0)) || 2;
+      // Bars with no notes (a part that sits out a system) don't set the length.
+      const lengths = (all) => page.parts.map((p) => p.measures[i]).filter((m) => m && (all || m.notes.length)).map((m) => m.length);
+      const length = Math.max(0, ...lengths(false)) || Math.max(0, ...lengths(true)) || 2;
       // sheet/sheetBar: which page's MusicXML, and which bar in it (for the As read view)
       const marks = page.parts.map((p) => p.measures[i]).filter(Boolean);
       measures.push({

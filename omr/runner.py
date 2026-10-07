@@ -94,6 +94,88 @@ def _merge_groups_swept(groups):
 
 bounding_boxes._merge_groups_optimized = _merge_groups_swept
 
+# homr assumes every system on a page has the same staves and drops staves at
+# the top or bottom of the page that don't fit (e.g. a solo line that stops,
+# so the last systems are just the choir). Keep them instead: split the page
+# into runs of systems that share a layout, read each run, and give a part that
+# is missing from a run empty bars there, so every part keeps the same bars.
+from homr import main as homr_main, staff_parsing  # noqa: E402
+from homr.staff_regions import StaffRegions  # noqa: E402
+from homr.transformer.vocabulary import EncodedSymbol, remove_duplicated_symbols  # noqa: E402
+
+_parse_staffs = staff_parsing.parse_staffs
+
+
+def _layout_runs(rows):
+    flat = staff_parsing._flatten_staffs(rows)
+    uniform = len({len(r.staffs) for r in rows}) == 1 and len(rows[0].staffs) > 1
+    core = None if uniform else staff_parsing._find_periodic_core(flat)
+    if core is None or core[1] == core[2] == 0:
+        return [staff_parsing._ensure_same_number_of_staffs(rows)]
+    _, front, back = core
+    cuts = (front, len(flat) - back)
+    piece_of = lambda k: (k >= cuts[0]) + (k >= cuts[1])  # noqa: E731
+    pieces = [[], [], []]
+    i = 0
+    for row in rows:
+        whole = piece_of(i) == piece_of(i + len(row.staffs) - 1)
+        for part in [row] if whole else row.break_apart():
+            pieces[piece_of(i)].append(part)
+            i += len(part.staffs)
+    return [run for piece in pieces if piece for run in _layout_runs(piece)]
+
+
+def _bar_count(symbols):
+    bars, open_bar = 0, False
+    for s in symbols:
+        if "barline" in s.rhythm or s.rhythm.startswith("repeat"):
+            bars, open_bar = bars + 1, False
+        elif s.rhythm.startswith(("note", "rest")):
+            open_bar = True
+    return bars + open_bar
+
+
+def _parse_staffs_by_layout(debug, staffs, image, config, selected_staff=-1, page_to_input_image=staff_parsing.identity):
+    runs = _layout_runs(staffs)
+    if len(runs) == 1:
+        return _parse_staffs(debug, staffs, image, config, selected_staff, page_to_input_image)
+    regions = StaffRegions([row for run in runs for row in run])
+    parts = {}  # (grand staff?, k-th of that kind) -> symbols
+    order = []
+    index = 0
+    for run in runs:
+        seen = {}
+        keys = []
+        for staff in run[0].staffs:
+            kind = staff.is_grandstaff
+            seen[kind] = seen.get(kind, -1) + 1
+            keys.append((kind, seen[kind]))
+        # A part first seen here goes before the next part it sits above.
+        for n, key in enumerate(keys):
+            if key not in order:
+                later = [order.index(k) for k in keys[n + 1 :] if k in order]
+                order.insert(min(later, default=len(order)), key)
+        for row in run:
+            read = {}
+            for key, staff in zip(keys, row.staffs):
+                symbols = staff_parsing.parse_staff_image(debug, index, staff, image, regions, config, page_to_input_image)
+                index += 1
+                if symbols:
+                    read[key] = symbols
+            bars = max((_bar_count(s) for s in read.values()), default=0)
+            for key in order:
+                filler = [EncodedSymbol("barline") for _ in range(bars)]
+                parts.setdefault(key, []).extend(read.get(key, filler) + [EncodedSymbol("newline")])
+    # Parts first seen in a later run need empty bars for the earlier runs too.
+    total = max(_bar_count(s) for s in parts.values())
+    for key in order:
+        missing = total - _bar_count(parts[key])
+        parts[key] = [EncodedSymbol("barline") for _ in range(missing)] + parts[key]
+    return [remove_duplicated_symbols(parts[key]) for key in order]
+
+
+homr_main.parse_staffs = _parse_staffs_by_layout
+
 # Skip writing the preview PNG; the app shows the original photo instead.
 Debug.write_teaser = lambda *args, **kwargs: None
 
