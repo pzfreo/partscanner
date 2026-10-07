@@ -339,6 +339,7 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .lock-box { flex: 1; display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .lock-box .check { flex: 1; }
 .panel .bottom .danger { margin: 0; }
+#read-again[hidden] { display: none; }
 
 details { margin-top: 24px; }
 .view-toggle { flex-direction: column; gap: 0; font-size: 0.62rem; font-weight: 600; line-height: 1.1; }

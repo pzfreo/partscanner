@@ -484,6 +484,7 @@ function setPageStatus(s) {
 let scanId = null;
 let scanCreated = null;
 let reading = false;
+let rereading = false; // reading a saved score's photos again: keep the old music until done
 
 let scanSettings = {}; // settings to save with the scan (the sample's)
 
@@ -493,6 +494,7 @@ function loadScan(images = [], xmls = [], id = null, created = null, title = "")
   scanId = id;
   scanCreated = created;
   scanSettings = {};
+  rereading = false;
   pageStatus = "";
   $("scan-name").value = title;
   renderPages();
@@ -559,6 +561,7 @@ function scanEntry(pending) {
 
 $("discard-scan").onclick = async () => {
   if (reading) return;
+  if (rereading) return goHome(); // the score is still saved as it was
   if (scanId) await db.remove(scanId).catch(() => {});
   loadScan();
   goHome();
@@ -684,7 +687,7 @@ async function readScan() {
   const release = keepAwake();
   scanId ??= crypto.randomUUID();
   scanCreated ??= Date.now();
-  let saved = await db.put(scanEntry(true)).then(() => true, () => false);
+  let saved = !rereading && (await db.put(scanEntry(true)).then(() => true, () => false));
   try {
     startWorker();
     await workerReady;
@@ -717,6 +720,7 @@ async function readScan() {
   saved = await db.put(entry).then(() => true, () => false);
   if (!saved) setPageStatus("Read OK, but couldn't save it on this phone (storage full?).");
   scanId = null;
+  rereading = false;
   // If they've gone back to the library meanwhile, it's just added there.
   if (!$("scan").hidden) openScore(entry, "replace");
   else renderLibrary();
@@ -1470,7 +1474,9 @@ function applyLock() {
     $("edit-markup"),
     $("clear-marks"),
     $("delete"),
+    $("read-again"),
   ]) el.disabled = locked;
+  $("read-again").hidden = !current.images?.length;
 }
 
 $("lock").onchange = () => {
@@ -1711,6 +1717,18 @@ for (const id of ["from-bar", "to-bar", "loop"]) {
     }
   };
 }
+
+// Read a score's photos again (e.g. after the reader improves), keeping its
+// title and settings. It stays as it was until the new reading is saved.
+$("read-again").onclick = () => {
+  if (reading) return show("scan");
+  const { id, created, title, images, pages: _pages, pending: _pending, ...settings } = liveEntry(current);
+  prepared = preparedAudio = null;
+  loadScan(images, [], id, created, title);
+  scanSettings = settings;
+  rereading = true;
+  readScan();
+};
 
 $("delete").onclick = () => {
   if ($("delete").dataset.confirm !== "1") {
