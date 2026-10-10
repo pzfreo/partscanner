@@ -85,6 +85,7 @@ window.addEventListener("popstate", (e) => {
   const st = e.state ?? {};
   if (!st.report) closeReport(false);
   if (!st.about) closeAbout(false);
+  if (!st.zoom) closeZoom(false);
   if (st.screen && !$(st.screen).hidden) {
     if (st.screen === "practice") {
       setPanel(!!st.panel, false);
@@ -634,6 +635,37 @@ $("gallery").onchange = (e) => {
   e.target.value = "";
 };
 
+async function rotatePage(p) {
+  p.blob = await rotateBlob(p.blob, 90);
+  delete p.xml;
+  URL.revokeObjectURL(p.url);
+  p.url = URL.createObjectURL(p.blob);
+  renderPages();
+}
+
+// A page full-screen, to check it's the right way up and readable; Rotate
+// turns it as the small button does. Back closes it.
+let zoomed = null;
+function openZoom(p) {
+  zoomed = p;
+  $("page-zoom-img").src = p.url;
+  $("page-zoom-num").textContent = `Page ${pages.indexOf(p) + 1} of ${pages.length}`;
+  $("page-zoom").hidden = false;
+  history.pushState({ ...history.state, zoom: true }, "");
+}
+function closeZoom(nav = true) {
+  if ($("page-zoom").hidden) return;
+  $("page-zoom").hidden = true;
+  zoomed = null;
+  if (nav && history.state?.zoom) history.back();
+}
+$("page-zoom-close").onclick = () => closeZoom();
+$("page-zoom-rotate").onclick = async () => {
+  if (!zoomed || reading) return;
+  await rotatePage(zoomed);
+  $("page-zoom-img").src = zoomed.url;
+};
+
 function renderPages() {
   $("pages").replaceChildren(
     ...pages.map((p, i) => {
@@ -642,13 +674,8 @@ function renderPages() {
         <button class="rotate" aria-label="Rotate page ${i + 1}">&#8635;</button>
         <button class="remove" aria-label="Remove page ${i + 1}">&times;</button>`;
       li.querySelector("img").src = p.url;
-      li.querySelector(".rotate").onclick = async () => {
-        p.blob = await rotateBlob(p.blob, 90);
-        delete p.xml;
-        URL.revokeObjectURL(p.url);
-        p.url = URL.createObjectURL(p.blob);
-        renderPages();
-      };
+      li.querySelector("img").onclick = () => openZoom(p);
+      li.querySelector(".rotate").onclick = () => rotatePage(p);
       li.querySelector(".remove").onclick = () => {
         URL.revokeObjectURL(p.url);
         pages.splice(i, 1);

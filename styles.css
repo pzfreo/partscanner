@@ -293,6 +293,12 @@ input[type="radio"], input[type="checkbox"] { width: 20px; height: 20px; accent-
 .report-card textarea { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); resize: vertical; }
 .report-card details { margin: 12px 0; }
 .report-card pre { max-height: 30vh; overflow: auto; padding: 8px; border-radius: 8px; background: var(--surface); font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; }
+/* A scan page full-screen (tap its thumbnail), to check it before reading. */
+.page-zoom { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: #111; }
+.page-zoom[hidden] { display: none; }
+.page-zoom img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.page-zoom-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: var(--bg); }
+.page-zoom-bar span { flex: 1; color: var(--muted); }
 .about-card h2 small { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
 .about-card h3 { font-size: 1rem; margin: 18px 0 6px; }
 .about-card p, .credits { font-size: 0.92rem; margin: 0 0 8px; }
@@ -373,3 +379,4 @@ details { margin-top: 24px; }
 
 summary { cursor: pointer; min-height: 32px; }
 #osmd { background: #fff; border-radius: 8px; overflow-x: auto; }
+#pages img { cursor: zoom-in; }
