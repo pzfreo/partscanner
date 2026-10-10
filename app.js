@@ -672,11 +672,12 @@ async function normalise(blob) {
 }
 
 let requestId = 0;
-function recognisePage(image) {
+// systems: the user's systems for this page ([top, bottom] ranges), if fixed.
+function recognisePage(image, systems) {
   const id = ++requestId;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    worker.postMessage({ type: "recognise", id, image }, [image]);
+    worker.postMessage({ type: "recognise", id, image, systems: systems?.length ? JSON.stringify(systems) : "" }, [image]);
   });
 }
 
@@ -698,7 +699,7 @@ async function readScan() {
       if (pages[i].xml) continue;
       pageLabel = `Page ${i + 1} of ${pages.length}`;
       setPageStatus("finding staves…");
-      pages[i].xml = await recognisePage(await normalise(pages[i].blob));
+      pages[i].xml = await recognisePage(await normalise(pages[i].blob), scanSettings.systemHints?.[i]);
       if (saved) await db.update(scanId, { pages: pages.map((p) => p.xml ?? null), resumes: 0 }).catch(() => {});
     }
     pageLabel = "";
@@ -1207,8 +1208,8 @@ function renderFollow() {
       img.src = photoUrl("practice", blob);
       const svg = document.createElementNS(SVG, "svg");
       svg.setAttribute("preserveAspectRatio", "none");
-      const view = { svg, marks: document.createElementNS(SVG, "g"), bar: svgEl("rect", "bar"), playhead: svgEl("line", "playhead"), note: svgEl("circle", "note") };
-      svg.append(view.marks, view.bar, view.playhead, view.note);
+      const view = { svg, marks: document.createElementNS(SVG, "g"), fix: document.createElementNS(SVG, "g"), bar: svgEl("rect", "bar"), playhead: svgEl("line", "playhead"), note: svgEl("circle", "note") };
+      svg.append(view.marks, view.fix, view.bar, view.playhead, view.note);
       img.onload = () => {
         const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
         view.w = img.naturalWidth * scale;
@@ -1216,8 +1217,9 @@ function renderFollow() {
         svg.setAttribute("viewBox", `0 0 ${view.w} ${view.h}`);
         if (p === 0) showBar(barRange()[0]);
         renderMarks();
+        renderFix();
       };
-      svg.onclick = (e) => (marking ? toggleMark(p, e) : pickBar(p, e));
+      svg.onclick = (e) => (fixing ? fixTap(p, e) : marking ? toggleMark(p, e) : pickBar(p, e));
       pageViews.push(view);
       div.append(img, svg);
       return div;
@@ -1349,7 +1351,7 @@ function renderPartChoice() {
   $("auto-part").hidden = marked > 0;
   $("marked-part").hidden = marked === 0;
   $("marked-count").textContent = `${marked} of ${score.systems.length} systems`;
-  $("tap-hint").textContent = marking ? "Tap the staff you sing in each system." : "Tap a bar to start from there.";
+  $("tap-hint").textContent = fixing ? "Tap the top staff of a system, then its bottom staff." : marking ? "Tap the staff you sing in each system." : "Tap a bar to start from there.";
 }
 
 // The sound is a preference for this device, not part of a score.
@@ -1396,8 +1398,9 @@ $("clear-marks").onclick = () => {
 // ---------- mark-up mode ----------
 
 let marking = false;
+let fixing = false; // marking systems (Fix systems) rather than your part
 
-function startMarkup() {
+function startMarkup(mode = "part") {
   if ($("view-toggle").hidden) return;
   setView("pages");
   player.stop();
@@ -1405,27 +1408,105 @@ function startMarkup() {
   const fromPanel = history.state?.panel;
   setPanel(false, false);
   marking = true;
+  fixing = mode === "systems";
   document.body.classList.add("marking");
-  $("markup-bar").hidden = false;
+  $(fixing ? "fix-bar" : "markup-bar").hidden = false;
+  if (fixing) startFix();
   const state = { screen: "practice", markup: true };
   if (fromPanel) history.replaceState(state, "");
   else history.pushState(state, "");
   renderPartChoice();
   window.scrollTo({ top: $("follow").offsetTop - 60, behavior: "smooth" });
 }
-$("start-markup").onclick = startMarkup;
-$("edit-markup").onclick = startMarkup;
+$("start-markup").onclick = () => startMarkup();
+$("edit-markup").onclick = () => startMarkup();
 
 // nav=false when the back button already left the mark-up history entry.
 function endMarkup(nav = true) {
   if (!marking) return;
   marking = false;
+  fixing = false;
   document.body.classList.remove("marking");
-  $("markup-bar").hidden = true;
+  $("markup-bar").hidden = $("fix-bar").hidden = true;
+  renderFix();
   if (nav && history.state?.markup) history.back();
   renderPartChoice();
 }
 $("markup-done").onclick = () => endMarkup();
+
+// ---------- Fix systems: say which staves are read together on a page ----------
+// For pages the reader grouped wrongly (parts then play out of step): bands
+// over the photo, one per system, from a tap on its top staff and one on its
+// bottom staff. They're kept with the score (systemHints: page -> [top,
+// bottom] in photo coordinates) and those pages are read again with them.
+
+let fixDraft = {};
+let fixPending = null; // { page, y }: first tap of a band
+
+function startFix() {
+  fixDraft = structuredClone(current.systemHints ?? {});
+  fixPending = null;
+  renderFix();
+}
+
+function fixTap(page, e) {
+  const { view, y } = tapPoint(page, e);
+  const bands = (fixDraft[page] ??= []);
+  const hit = bands.findIndex(([top, bottom]) => top <= y && y <= bottom);
+  if (hit >= 0) bands.splice(hit, 1);
+  else if (fixPending?.page === page) {
+    const pad = view.h * 0.015; // the taps are on staves: take them in whole
+    bands.push([Math.min(fixPending.y, y) - pad, Math.max(fixPending.y, y) + pad]);
+    bands.sort((a, b) => a[0] - b[0]);
+    fixPending = null;
+  } else fixPending = { page, y };
+  renderFix();
+}
+
+function renderFix() {
+  for (const [p, view] of pageViews.entries()) {
+    view.fix.replaceChildren();
+    if (!fixing || !view.w) continue;
+    const rect = (cls, x, y, w, h) => {
+      const r = document.createElementNS(SVG, "rect");
+      for (const [k, v] of Object.entries({ class: cls, x, y, width: w, height: h, rx: view.w * 0.006 })) r.setAttribute(k, v);
+      view.fix.append(r);
+    };
+    for (const sys of score.systems) {
+      if (sys.page !== p || !sys.box || !sys.staves.length) continue;
+      const y0 = Math.min(...sys.staves.map((st) => st.y0));
+      const y1 = Math.max(...sys.staves.map((st) => st.y1));
+      rect("fix-current", sys.box.x0 - view.w * 0.02, y0 - view.h * 0.01, sys.box.x1 - sys.box.x0 + view.w * 0.04, y1 - y0 + view.h * 0.02);
+    }
+    for (const [top, bottom] of fixDraft[p] ?? []) rect("fix-band", view.w * 0.02, top, view.w * 0.96, bottom - top);
+    if (fixPending?.page === p) {
+      const line = document.createElementNS(SVG, "line");
+      for (const [k, v] of Object.entries({ class: "fix-pending", x1: view.w * 0.02, x2: view.w * 0.98, y1: fixPending.y, y2: fixPending.y })) line.setAttribute(k, v);
+      view.fix.append(line);
+    }
+  }
+}
+
+$("start-fix").onclick = () => startMarkup("systems");
+$("fix-cancel").onclick = () => endMarkup();
+$("fix-done").onclick = () => {
+  const hints = Object.fromEntries(Object.entries(fixDraft).filter(([, bands]) => bands.length));
+  const saved = current.systemHints ?? {};
+  const changed = (current.images ?? []).map((_, i) => i).filter((i) => JSON.stringify(hints[i] ?? []) !== JSON.stringify(saved[i] ?? []));
+  if (!changed.length || reading) return endMarkup();
+  // Stay on this history entry (going back here would land after the reading
+  // screen opens and close it).
+  history.replaceState({ screen: "practice" }, "");
+  endMarkup(false);
+  // Read just those pages again, as Read again does (the score stays as it
+  // was until the reading is done).
+  const { id, created, title, images, pages: xmls, pending: _pending, ...settings } = liveEntry(current);
+  prepared = preparedAudio = null;
+  loadScan(images, xmls.map((x, i) => (changed.includes(i) ? null : x)), id, created, title);
+  scanSettings = { ...settings, systemHints: hints };
+  rereading = true;
+  readScan();
+};
 
 // Tap a staff to mark it as yours in that system. Tapping the marked staff
 // again steps upper voice -> lower voice -> unmarked (one-voice staff: unmarks).
@@ -1520,7 +1601,9 @@ function applyLock() {
     $("clear-marks"),
     $("delete"),
     $("read-again"),
+    $("start-fix"),
   ]) el.disabled = locked;
+  $("fix-link").hidden = !current.images?.length;
   $("read-again").hidden = !current.images?.length;
 }
 

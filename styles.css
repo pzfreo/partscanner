@@ -187,6 +187,9 @@ body.marking .transport { display: none; }
 select { min-height: 40px; font: inherit; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .link { min-height: 0; padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; font-weight: 400; }
 .photo-list .mark { fill: var(--gold); fill-opacity: 0.16; stroke: var(--gold); stroke-opacity: 0.6; stroke-width: 4; }
+.photo-list .fix-current { fill: none; stroke: var(--muted); stroke-opacity: 0.6; stroke-width: 3; stroke-dasharray: 12 8; }
+.photo-list .fix-band { fill: var(--accent); fill-opacity: 0.12; stroke: var(--accent); stroke-opacity: 0.7; stroke-width: 4; }
+.photo-list .fix-pending { stroke: var(--accent); stroke-width: 5; stroke-dasharray: 16 10; }
 .photo-list .mark-label { fill: #a8690f; font-family: "Plus Jakarta Sans", system-ui, sans-serif; font-weight: 700; }
 .lines { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .lines li {

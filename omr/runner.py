@@ -1,5 +1,6 @@
 """Runs homr on one page image inside Pyodide and returns its MusicXML."""
 
+import json
 import sys
 import types
 
@@ -227,11 +228,45 @@ def _split_false_grand_staffs(debug, rows, image, config, page_to_input_image):
     return result
 
 
+# Systems the user marked on this page (Fix systems in the app): vertical
+# ranges on the input image. Each range's staves are read as one system; the
+# other staves keep homr's grouping.
+_user_ranges = []
+
+
+def _user_systems(rows, page_to_input_image):
+    def middle(staff):
+        return page_to_input_image(((staff.min_x + staff.max_x) / 2, (staff.min_y + staff.max_y) / 2))[1]
+
+    # Pieces of staves (much shorter than the page's staves) are misreadings.
+    widths = sorted(s.max_x - s.min_x for r in rows for s in r.staffs)
+    width = widths[len(widths) // 2]
+    chosen = [[] for _ in _user_ranges]
+    rest = []
+    for row in rows:
+        left = []
+        for staff in row.staffs:
+            if staff.max_x - staff.min_x < 0.6 * width:
+                continue
+            y = middle(staff)
+            k = next((k for k, (top, bottom) in enumerate(_user_ranges) if top <= y <= bottom), None)
+            (left if k is None else chosen[k]).append(staff)
+        if left:
+            rest.append(homr_model.MultiStaff(left, []))
+    systems = [homr_model.MultiStaff(c, []) for c in chosen if c] + rest
+    eprint("Systems as marked:", [len(s.staffs) for s in sorted(systems, key=lambda s: s.staffs[0].min_y)])
+    return sorted(systems, key=lambda s: s.staffs[0].min_y)
+
+
 def _parse_staffs_by_layout(debug, staffs, image, config, selected_staff=-1, page_to_input_image=staff_parsing.identity):
     _parsed.clear()
     staffs = _split_false_grand_staffs(debug, staffs, image, config, page_to_input_image)
-    runs = _layout_runs(staffs)
-    if len(runs) == 1:
+    if _user_ranges:
+        staffs = _user_systems(staffs, page_to_input_image)
+        runs = _runs_of_alike_rows(staffs)
+    else:
+        runs = _layout_runs(staffs)
+    if len(runs) == 1 and not _user_ranges:
         return _parse_staffs(debug, staffs, image, config, selected_staff, page_to_input_image)
     regions = StaffRegions([row for run in runs for row in run])
     parts = {}  # (grand staff?, k-th of that kind) -> symbols
@@ -342,7 +377,11 @@ _CONFIG = ProcessingConfig(
 )
 
 
-def recognise(image_path):
+def recognise(image_path, systems_json=""):
+    """systems_json: optional JSON list of [top, bottom] ranges on the image,
+    one per system, from the user (see _user_systems)."""
+    global _user_ranges
+    _user_ranges = json.loads(systems_json) if systems_json else []
     xml_path = process_image(image_path, _CONFIG, XmlGeneratorArguments())
     with open(xml_path, encoding="utf-8") as f:
         return f.read()

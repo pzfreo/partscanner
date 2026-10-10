@@ -45,7 +45,15 @@ then *Add to Home screen*.
   Marks are shaded on the photos and, when there are any, take precedence over
   the list; unmarked systems have no part of yours. Your part plays at full
   volume, the others at the "Other parts" level; a pitch option shifts your part
-  an octave (homr doesn't know the tenor clef's octave).
+  an octave (homr doesn't know the tenor clef's octave). Each staff's outline
+  (from homr's staff detection, written on every note and rest) places it, so
+  a staff that only rests can still be marked (`tests/drive-mark-every-staff.js`).
+- **Fix systems**: where the reader groups a page's staves into systems wrongly
+  (parts then play out of step), tap the top and bottom staff of each system to
+  make a band; Read again reads those pages with each band's staves as one
+  system (`recognise(path, systems_json)` in `omr/runner.py`). The bands are
+  kept with the score (`systemHints`) and used by later Read agains
+  (`tests/drive-fix-systems.js`).
 - **Pages / As read** (button in the bottom bar): switch between your photos and the recognised score drawn
   with OpenSheetMusicDisplay (to spot recognition errors). Both follow along
   (bar highlight + playhead; the note marker and marking are on Pages) and take

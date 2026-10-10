@@ -252,7 +252,8 @@ self.onmessage = async ({ data }) => {
       pyodide.FS.writeFile(path, new Uint8Array(data.image));
       const t0 = performance.now();
       runTimes = [];
-      const xml = await recognise.callPromising(path);
+      // data.systems: the user's systems for this page (JSON), if they fixed it.
+      const xml = await recognise.callPromising(path, data.systems ?? "");
       const ms = Math.round(performance.now() - t0);
       const names = [...sessionIds.keys()];
       const parts = names.map((n) => `${n.split("_")[0]} ${Math.round(runTimes[sessionIds.get(n)]?.ms ?? 0)} ms/${runTimes[sessionIds.get(n)]?.calls ?? 0} calls`);

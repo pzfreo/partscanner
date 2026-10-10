@@ -200,6 +200,7 @@
             <button id="clear-marks" class="danger-text">Clear marks</button>
           </div>
         </div>
+        <p id="fix-link" class="hint">Parts out of step, or staves grouped wrongly on a page? <button id="start-fix" class="link">Fix systems</button></p>
 
         <div class="controls">
           <label><span>Other parts <output id="others-val"></output></span>
@@ -243,6 +244,12 @@
         </div>
         <p id="lock-help" class="hint" hidden>Locked: your part, the title, Read again and Delete can't be changed by accident.</p>
         <p class="report-link"><button class="link report-open">Report a problem</button> · <button class="link about-open">About</button></p>
+      </div>
+
+      <div id="fix-bar" class="markup-bar" hidden>
+        <p>Tap the top staff of a system, then its bottom staff. Tap a band to remove it. Faint outlines show how it was read.</p>
+        <button id="fix-cancel">Cancel</button>
+        <button id="fix-done" class="primary">Read again</button>
       </div>
 
       <div id="markup-bar" class="markup-bar" hidden>
