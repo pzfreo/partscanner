@@ -100,16 +100,40 @@ bounding_boxes._merge_groups_optimized = _merge_groups_swept
 # into runs of systems that share a layout, read each run, and give a part that
 # is missing from a run empty bars there, so every part keeps the same bars.
 from homr import main as homr_main, staff_parsing  # noqa: E402
+from homr.simple_logging import eprint  # noqa: E402
 from homr.staff_regions import StaffRegions  # noqa: E402
 from homr.transformer.vocabulary import EncodedSymbol, empty, remove_duplicated_symbols  # noqa: E402
 
 _parse_staffs = staff_parsing.parse_staffs
 
 
+def _runs_of_alike_rows(rows):
+    runs = [[rows[0]]]
+    for row in rows[1:]:
+        same = [s.is_grandstaff for s in row.staffs] == [s.is_grandstaff for s in runs[-1][0].staffs]
+        runs[-1].append(row) if same else runs.append([row])
+    return runs
+
+
 def _layout_runs(rows):
     flat = staff_parsing._flatten_staffs(rows)
     uniform = len({len(r.staffs) for r in rows}) == 1 and len(rows[0].staffs) > 1
     core = None if uniform else staff_parsing._find_periodic_core(flat)
+    grouped = len(rows) > 1 and any(len(r.staffs) > 1 for r in rows)
+    if core is not None and grouped:
+        # Don't trim through a system homr grouped itself.
+        cuts = (core[1], len(flat) - core[2])
+        i = 0
+        for row in rows:
+            if len(row.staffs) > 1 and any(i < c < i + len(row.staffs) for c in cuts):
+                core = None
+                break
+            i += len(row.staffs)
+    if core is None and grouped:
+        # Systems already grouped, but not all alike (e.g. a staff missed in
+        # one, or a piano introduction above the choir): read them as runs of
+        # alike systems rather than every staff in turn as one part.
+        return [run for piece in _runs_of_alike_rows(rows) for run in (_layout_runs(piece) if len(piece[0].staffs) == 1 else [piece])]
     if core is None or core[1] == core[2] == 0:
         return [staff_parsing._ensure_same_number_of_staffs(rows)]
     _, front, back = core
@@ -135,7 +159,60 @@ def _bar_count(symbols):
     return bars + open_bar
 
 
+# homr pairs two staves into a grand staff (piano-style) when it finds
+# brace-like ink at their left, so a stray mark can pair two choir staves.
+# A real grand staff has different clefs (treble over bass); when both halves
+# read with the same clef, read them as two staves. Each staff is read once
+# per page (cached) however often it's asked for.
+from homr import model as homr_model  # noqa: E402
+
+_merge_staff = homr_model.Staff.merge
+
+
+def _merge_keeping_halves(self, other):
+    result = _merge_staff(self, other)
+    result.halves = (self, other)
+    return result
+
+
+homr_model.Staff.merge = _merge_keeping_halves
+
+_parse_staff_image = staff_parsing.parse_staff_image
+_parsed = {}
+
+
+def _parse_staff_image_once(debug, index, staff, *args, **kwargs):
+    if id(staff) not in _parsed:
+        _parsed[id(staff)] = _parse_staff_image(debug, index, staff, *args, **kwargs)
+    return list(_parsed[id(staff)])
+
+
+staff_parsing.parse_staff_image = _parse_staff_image_once
+
+
+def _split_false_grand_staffs(debug, rows, image, config, page_to_input_image):
+    regions = StaffRegions(rows)
+    result = []
+    for row in rows:
+        staffs = []
+        for staff in row.staffs:
+            halves = getattr(staff, "halves", None)
+            if halves:
+                symbols = staff_parsing.parse_staff_image(debug, 0, staff, image, regions, config, page_to_input_image)
+                first = next((i for i, s in enumerate(symbols) if s.rhythm.startswith(("note", "rest"))), len(symbols))
+                clefs = {s.position: s.rhythm[5:6] for s in symbols[:first] if s.rhythm.startswith("clef")}
+                if clefs.get("upper") and clefs.get("upper") == clefs.get("lower"):
+                    eprint("Two staves with the same clef paired as a grand staff; reading them apart")
+                    staffs.extend(halves)
+                    continue
+            staffs.append(staff)
+        result.append(homr_model.MultiStaff(staffs, row.connections))
+    return result
+
+
 def _parse_staffs_by_layout(debug, staffs, image, config, selected_staff=-1, page_to_input_image=staff_parsing.identity):
+    _parsed.clear()
+    staffs = _split_false_grand_staffs(debug, staffs, image, config, page_to_input_image)
     runs = _layout_runs(staffs)
     if len(runs) == 1:
         return _parse_staffs(debug, staffs, image, config, selected_staff, page_to_input_image)
