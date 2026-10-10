@@ -1521,7 +1521,8 @@ $("fix-cancel").onclick = () => endMarkup();
 $("fix-done").onclick = () => {
   const hints = Object.fromEntries(Object.entries(fixDraft).filter(([, bands]) => bands.length));
   const saved = current.systemHints ?? {};
-  const changed = (current.images ?? []).map((_, i) => i).filter((i) => JSON.stringify(hints[i] ?? []) !== JSON.stringify(saved[i] ?? []));
+  // Pages with bands, and pages whose bands were all removed.
+  const changed = (current.images ?? []).map((_, i) => i).filter((i) => hints[i] || saved[i]?.length);
   if (!changed.length || reading) return endMarkup();
   // Stay on this history entry (going back here would land after the reading
   // screen opens and close it).
@@ -1917,9 +1918,9 @@ function readMark(cls) {
 
 // Bar `i` of a rendered page, in pixels within its container.
 function readBarBox(view, i) {
-  const staves = view.osmd.GraphicSheet?.MeasureList?.[i];
+  const staves = view.osmd?.GraphicSheet?.MeasureList?.[i];
   if (!staves) return null;
-  const unit = 10 * view.osmd.zoom; // OSMD units -> px
+  const unit = 10 * view.osmd.zoom; // OSMD units -> px (osmd is set: staves were found)
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   let lead = 0; // clef/key/time at the start of a system
   for (const m of staves) {
@@ -2057,10 +2058,19 @@ async function renderRead() {
         drawPartNames: false,
       });
       osmd.EngravingRules.UseXMLMeasureNumbers = true;
-      await osmd.load(numberBars(xml, score.measures.find((b) => b.sheet === readViews.length)?.number ?? 1));
-      osmd.zoom = 0.6;
-      osmd.render();
       const sheet = readViews.length;
+      try {
+        await osmd.load(numberBars(xml, score.measures.find((b) => b.sheet === sheet)?.number ?? 1));
+        osmd.zoom = 0.6;
+        osmd.render();
+      } catch (e) {
+        // One page the viewer can't draw shouldn't hide the others.
+        div.replaceChildren();
+        div.className = "read-page read-failed muted";
+        div.textContent = `Page ${sheet + 1} can't be shown here (${e.message}). It still plays.`;
+        readViews.push({ osmd: null, div, bar: readMark("read-bar"), playhead: readMark("read-playhead") });
+        continue;
+      }
       const view = { osmd, div, bar: readMark("read-bar"), playhead: readMark("read-playhead") };
       div.append(view.bar, view.playhead);
       div.onclick = (e) => pickReadBar(sheet, e);

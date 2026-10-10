@@ -45,4 +45,10 @@ r.hints = entry.systemHints && Object.keys(entry.systemHints);
 r.otherPagesKept = entry.pages.slice(1).every((x, i) => x === r.pagesBefore[i + 1]);
 r.page1Changed = entry.pages[0] !== r.pagesBefore[0];
 delete r.pagesBefore;
+// Read again with the same bands still reads those pages again.
+$("start-fix").click();
+await sleep(300);
+$("fix-done").click();
+r.againStarted = await waitFor(() => !$("scan").hidden, 5000, "reading again").then(() => true, () => false);
+await waitFor(() => !$("practice").hidden, 900000, "read again (same bands)");
 window.result = r;

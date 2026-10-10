@@ -356,6 +356,7 @@ details { margin-top: 24px; }
 .read-view { margin-top: 12px; }
 .read-view .muted { margin: 0 0 8px; }
 .read-page { position: relative; cursor: pointer; }
+.read-page.read-failed { cursor: default; padding: 16px 0; }
 .read-bar, .read-playhead { position: absolute; pointer-events: none; }
 .read-bar[hidden], .read-playhead[hidden] { display: none; }
 .read-bar { background: color-mix(in srgb, var(--accent) 10%, transparent); border: 2px solid var(--accent); border-radius: 4px; }
