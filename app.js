@@ -1453,7 +1453,7 @@ function renderMarks() {
     for (const [sysIndex, lineId] of Object.entries(current.manual)) {
       const sys = score.systems[sysIndex];
       const line = score.lines[lineId];
-      const staff = sys?.page === p && sys.staves.find((st) => st.lines.includes(Number(lineId)));
+      const staff = sys?.page === p && (sys.staves.find((st) => st.lines.includes(Number(lineId))) ?? sys.staves.find((st) => st.key === line?.staffKey));
       if (!staff) continue;
       const px = view.w * 0.015;
       const py = view.h * 0.012;
@@ -1465,7 +1465,7 @@ function renderMarks() {
       rect.setAttribute("height", staff.y1 - staff.y0 + 2 * py);
       rect.setAttribute("rx", view.w * 0.006);
       view.marks.append(rect);
-      if (line.voice !== "only") {
+      if (line.voice !== "only" && staff.lines.length > 1) {
         const label = document.createElementNS(SVG, "text");
         label.setAttribute("class", "mark-label");
         label.setAttribute("x", sys.box.x1 + px - view.w * 0.005);

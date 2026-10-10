@@ -560,6 +560,14 @@ function findSystems(measures, lines) {
         staves.set(key, st);
       }
     }
+    // A staff's second voice only counts in this system if it sings
+    // something different here; otherwise it's one voice (no upper/lower).
+    const heard = (id) => new Set(lines[id].notes.filter((n) => n.t >= sys.start && n.t < sys.end).map((n) => `${n.t}:${n.midi}`));
+    const sameAs = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
+    for (const st of staves.values()) {
+      const ids = [...st.lines];
+      if (ids.length === 2 && sameAs(heard(ids[0]), heard(ids[1]))) st.lines.delete(ids.find((id) => lines[id].voice === "lower") ?? ids[1]);
+    }
     sys.staves = [...staves.values()].map((st) => ({ ...st, lines: [...st.lines] })).sort((a, b) => a.y0 - b.y0);
   }
   return systems;
