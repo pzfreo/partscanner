@@ -542,7 +542,7 @@ function resumeScan(entry) {
 // On launch, carry on with a scan that was interrupted, unless it has already
 // been resumed twice without progress (e.g. the phone keeps running out of memory).
 async function resumeUnfinished() {
-  const entry = (await db.all().catch(() => [])).find((e) => e.pending);
+  const entry = (await db.all().catch(() => [])).find((e) => e.pending && !e.stopped);
   if (!entry || (entry.resumes ?? 0) >= 2) return;
   await db.update(entry.id, { resumes: (entry.resumes ?? 0) + 1 }).catch(() => {});
   resumeScan(entry);
@@ -681,25 +681,40 @@ function recognisePage(image, systems) {
   });
 }
 
-$("recognise").onclick = () => readScan();
+$("recognise").onclick = () => (reading ? stopReading?.() : readScan());
+
+// While reading, the Read music button stops it: the reader is shut down at
+// once (even mid-page; it starts again for the next read). Pages already read
+// are kept, and Read music carries on from the next one.
+let stopReading = null;
+class Stopped extends Error {}
 
 async function readScan() {
   if (reading) return;
   reading = true;
-  $("recognise").disabled = true;
+  $("recognise").textContent = "Stop reading";
+  const stopped = new Promise((_, reject) => {
+    stopReading = () => {
+      reject(new Stopped());
+      for (const p of pending.values()) p.reject(new Stopped());
+      pending.clear();
+      resetWorker();
+    };
+  });
+  stopped.catch(() => {});
   const release = keepAwake();
   scanId ??= crypto.randomUUID();
   scanCreated ??= Date.now();
   let saved = !rereading && (await db.put(scanEntry(true)).then(() => true, () => false));
   try {
     startWorker();
-    await workerReady;
+    await Promise.race([workerReady, stopped]);
     const t0 = performance.now();
     for (let i = 0; i < pages.length; i++) {
       if (pages[i].xml) continue;
       pageLabel = `Page ${i + 1} of ${pages.length}`;
       setPageStatus("finding staves…");
-      pages[i].xml = await recognisePage(await normalise(pages[i].blob), scanSettings.systemHints?.[i]);
+      pages[i].xml = await Promise.race([recognisePage(await normalise(pages[i].blob), scanSettings.systemHints?.[i]), stopped]);
       if (saved) await db.update(scanId, { pages: pages.map((p) => p.xml ?? null), resumes: 0 }).catch(() => {});
     }
     pageLabel = "";
@@ -707,16 +722,30 @@ async function readScan() {
     track("read-ok", `${pages.length} page${pages.length === 1 ? "" : "s"}`);
   } catch (e) {
     pageLabel = "";
+    if (e instanceof Stopped) {
+      // Not carried on by itself when the app next opens.
+      if (saved) await db.update(scanId, { stopped: true }).catch(() => {});
+      const done = pages.filter((p) => p.xml).length;
+      setEngineStatus("");
+      setPageStatus(
+        rereading
+          ? "Stopped. The score is as it was."
+          : `Stopped${done ? ` after ${done} of ${pages.length} pages` : ""}. Tap Read music to carry on.`,
+      );
+      return;
+    }
     track("read-failed");
     // A Python traceback ends with the actual error; show that first, since
     // the full trace runs off the bottom of a phone screen.
     const lines = e.message.trim().split("\n");
     const why = lines.length > 1 ? `${lines.at(-1)}\n\n${e.message}` : e.message;
     setPageStatus(`Couldn't read page ${pages.findIndex((p) => !p.xml) + 1}: ${why}`);
-    $("recognise").disabled = false;
     return;
   } finally {
     reading = false;
+    stopReading = null;
+    $("recognise").textContent = "Read music";
+    $("recognise").disabled = pages.length === 0;
     release();
   }
   const entry = scanEntry(false);
