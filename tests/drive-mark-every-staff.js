@@ -31,6 +31,10 @@ for (const sys of score.systems) {
   const [, , w, h] = svg.getAttribute("viewBox").split(" ").map(Number);
   for (const st of sys.staves) {
     r.staves++;
+    // Already marked by a tap on the same staff in a system the reader split
+    // this row into (one tap marks it in each): tapping again would unmark.
+    const before = (await db.all()).find((e) => e.id === entry.id).manual?.[sys.index];
+    if (st.lines.includes(Number(before)) && sys.index > 0) continue;
     const x = (sys.box.x0 + sys.box.x1) / 2;
     const y = (st.y0 + st.y1) / 2;
     const rect = svg.getBoundingClientRect();
@@ -39,7 +43,7 @@ for (const sys of score.systems) {
     const marked = (await db.all()).find((e) => e.id === entry.id).manual?.[sys.index];
     const shaded = [...svg.querySelectorAll("rect.mark")].some((m) => +m.getAttribute("y") <= y && y <= +m.getAttribute("y") + +m.getAttribute("height"));
     const label = [...svg.querySelectorAll("text.mark-label")].some((t) => Math.abs(+t.getAttribute("y") - st.y0) < h * 0.03);
-    if (label) r.labelled.push(`${st.key}${st.lines.length > 1 ? "" : " (one voice!)"}`);
+    if (label) r.labelled.push(`${st.key}${st.lines.length > 1 ? "" : ` (one voice!) sys ${sys.index} y ${Math.round(st.y0)}`}`);
     if (!st.lines.includes(Number(marked)) || !shaded)
       r.failures.push({ sys: sys.index, page: sys.page + 1, staff: st.key, y: Math.round(y), lines: st.lines, marked, shaded });
   }

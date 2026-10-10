@@ -1443,12 +1443,14 @@ function toggleMark(page, e) {
   const { sys, staff } = best;
   const order = { upper: 0, only: 1, lower: 2 };
   const choices = staff.lines.slice().sort((a, b) => order[score.lines[a].voice] - order[score.lines[b].voice]);
-  const now = choices.indexOf(current.manual[sys.index]);
-  const next = now < 0 ? choices[0] : choices[now + 1];
   // The same staff can belong to two systems the reader split one row into:
-  // mark (or unmark) it in each.
+  // mark (or unmark) it in each, starting over unless it's marked in all.
+  const targets = [best, ...cands.filter((c) => c.sys !== sys && c.dy === 0 && best.dy === 0 && c.staff.key === staff.key)];
+  const everywhere = targets.every((c) => c.staff.lines.includes(current.manual[c.sys.index]));
+  const now = everywhere ? choices.indexOf(current.manual[sys.index]) : -1;
+  const next = now < 0 ? choices[0] : choices[now + 1];
   const manual = { ...current.manual };
-  for (const c of [best, ...cands.filter((c) => c.sys !== sys && c.dy === 0 && best.dy === 0 && c.staff.key === staff.key)]) {
+  for (const c of targets) {
     delete manual[c.sys.index];
     if (next == null) continue;
     const voice = score.lines[next].voice;
