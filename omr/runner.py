@@ -33,6 +33,9 @@ _build_image_position = music_xml_generator.build_image_position
 def _build_image_position_and_voice(xml, symbol):
     _build_image_position(xml, symbol)
     xml.append(ET.Comment(f" homr-voice: {symbol.position} "))
+    box = getattr(symbol, "staff_box", None)
+    if box:
+        xml.append(ET.Comment(" staff-box: " + ", ".join(str(round(v)) for v in box) + " "))
 
 
 music_xml_generator.build_image_position = _build_image_position_and_voice
@@ -181,9 +184,23 @@ _parse_staff_image = staff_parsing.parse_staff_image
 _parsed = {}
 
 
-def _parse_staff_image_once(debug, index, staff, *args, **kwargs):
+def _parse_staff_image_once(debug, index, staff, image, regions, config, page_to_input_image=staff_parsing.identity):
     if id(staff) not in _parsed:
-        _parsed[id(staff)] = _parse_staff_image(debug, index, staff, *args, **kwargs)
+        symbols = _parse_staff_image(debug, index, staff, image, regions, config, page_to_input_image)
+        # Where the staff is on the photo, for marking a part: every note and
+        # rest carries it (so a staff that only rests can still be marked).
+        halves = getattr(staff, "halves", None) or (staff, staff)
+
+        def box(st):
+            x0, y0 = page_to_input_image((st.min_x, st.min_y))
+            x1, y1 = page_to_input_image((st.max_x, st.max_y))
+            return x0, y0, x1, y1
+
+        boxes = {"upper": box(halves[0]), "lower": box(halves[1])}
+        for sym in symbols:
+            if sym.rhythm.startswith(("note", "rest")):
+                sym.staff_box = boxes["lower" if sym.position.startswith("lower") else "upper"]
+        _parsed[id(staff)] = symbols
     return list(_parsed[id(staff)])
 
 

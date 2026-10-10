@@ -19,6 +19,16 @@ function imagePosition(note) {
 
 // The reader also records homr's own voice tag (omr/runner.py): upper/lower
 // for the first (stem-up) voice on a staff, upper2/lower2 for the second.
+// And the outline of the staff it was read from (omr/runner.py), so a staff
+// can be marked even where it only has rests.
+function staffBox(note) {
+  for (const c of note.childNodes) {
+    const m = c.nodeType === Node.COMMENT_NODE && /staff-box:\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)/.exec(c.data);
+    if (m) return { x0: Number(m[1]), y0: Number(m[2]), x1: Number(m[3]), y1: Number(m[4]) };
+  }
+  return null;
+}
+
 function voiceTag(note) {
   for (const c of note.childNodes) {
     const m = c.nodeType === Node.COMMENT_NODE && /homr-voice:\s*(\w+)/.exec(c.data);
@@ -76,6 +86,7 @@ export function parsePage(xmlText) {
             tieStop: !!el.querySelector('tie[type="stop"]'),
             pos: imagePosition(el),
             tag: voiceTag(el),
+            box: staffBox(el),
           });
         }
         maxPos = Math.max(maxPos, pos);
@@ -454,6 +465,26 @@ export function buildScore(pages) {
     (a, b) => a.order.reduce((s, x) => s + x, 0) / a.order.length - b.order.reduce((s, x) => s + x, 0) / b.order.length,
   );
 
+  // Each staff's outline in each bar (rests included), for marking.
+  const staffBoxes = [];
+  pages.forEach((page, p) => {
+    for (const part of page.parts) {
+      part.measures.forEach((m, i) => {
+        const t = measures[pageMeasureStart[p] + i].start;
+        const seen = new Map();
+        for (const n of m.notes) {
+          if (!n.box) continue;
+          const key = n.staffKey ?? `${part.key}/${n.staff}`;
+          const b = seen.get(key) ?? { page: p, t, staffKey: key, y0: Infinity, y1: -Infinity };
+          b.y0 = Math.min(b.y0, n.box.y0);
+          b.y1 = Math.max(b.y1, n.box.y1);
+          seen.set(key, b);
+        }
+        staffBoxes.push(...seen.values());
+      });
+    }
+  });
+
   const lines = [];
   const built = [];
   for (const info of orderedParts) {
@@ -514,7 +545,7 @@ export function buildScore(pages) {
     ["Soprano", "Alto", "Tenor", "Bass"].forEach((name, i) => (lines[i].label = name));
   }
   lines.forEach((l, i) => (l.id = i));
-  const systems = findSystems(measures, lines);
+  const systems = findSystems(measures, lines, staffBoxes);
   return { title: pages.find((p) => p.title)?.title || "", measures, lines, systems, length: t };
 }
 
@@ -522,7 +553,13 @@ export function buildScore(pages) {
 // on a new page, when a bar sits left of the previous one, or below it. For each system,
 // lists its staves top to bottom with their extent on the photo and the lines
 // (voices) on each, so a tap can be mapped to a staff and voice.
-function findSystems(measures, lines) {
+function findSystems(measures, lines, staffBoxes = []) {
+  const linesOn = new Map(); // staff key -> ids of the lines sung on it
+  for (const line of lines) {
+    for (const key of new Set([line.staffKey, ...line.notes.map((n) => n.staffKey).filter(Boolean)])) {
+      linesOn.set(key, [...(linesOn.get(key) ?? []), line.id]);
+    }
+  }
   const systems = [];
   let cur = null;
   let lastBox = null;
@@ -559,6 +596,18 @@ function findSystems(measures, lines) {
         st.lines.add(line.id);
         staves.set(key, st);
       }
+    }
+    // The staves' outlines as read, which also place staves that only rest here.
+    for (const b of staffBoxes) {
+      if (b.t < sys.start || b.t >= sys.end || b.page !== sys.page) continue;
+      const ids = linesOn.get(b.staffKey) ?? [];
+      if (!ids.length) continue;
+      const st = staves.get(b.staffKey) ?? { key: b.staffKey, y0: Infinity, y1: -Infinity, lines: new Set() };
+      if (!st.boxed) [st.y0, st.y1, st.boxed] = [b.y0, b.y1, true];
+      st.y0 = Math.min(st.y0, b.y0);
+      st.y1 = Math.max(st.y1, b.y1);
+      for (const id of ids) st.lines.add(id);
+      staves.set(b.staffKey, st);
     }
     // A staff's second voice only counts in this system if it sings
     // something different here; otherwise it's one voice (no upper/lower).

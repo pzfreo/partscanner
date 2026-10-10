@@ -1429,20 +1429,31 @@ $("markup-done").onclick = () => endMarkup();
 // Tap a staff to mark it as yours in that system. Tapping the marked staff
 // again steps upper voice -> lower voice -> unmarked (one-voice staff: unmarks).
 function toggleMark(page, e) {
-  const { view, y } = tapPoint(page, e);
-  const gap = (y0, y1) => Math.max(y0 - y, 0, y - y1);
-  const pad = view.h * 0.03;
-  const sys = score.systems
-    .filter((s) => s.page === page && s.box && s.staves.length)
-    .sort((a, b) => gap(a.box.y0 - pad, a.box.y1 + pad) - gap(b.box.y0 - pad, b.box.y1 + pad))[0];
-  if (!sys) return;
-  const staff = sys.staves.slice().sort((a, b) => gap(a.y0, a.y1) - gap(b.y0, b.y1))[0];
+  const { x, y } = tapPoint(page, e);
+  const gap = (a0, a1, v) => Math.max(a0 - v, 0, v - a1);
+  // The staff nearest the tap on this page, whichever system it's in (systems
+  // can overlap on the photo when the reader misjudges them).
+  const cands = score.systems
+    .filter((s) => s.page === page && s.box)
+    .flatMap((sys) => sys.staves.map((staff) => ({ sys, staff, dy: gap(staff.y0, staff.y1, y), dx: gap(sys.box.x0, sys.box.x1, x) })))
+    .sort((a, b) => a.dy - b.dy || a.dx - b.dx);
+  const best = cands[0];
+  if (!best) return;
+  const { sys, staff } = best;
   const order = { upper: 0, only: 1, lower: 2 };
   const choices = staff.lines.slice().sort((a, b) => order[score.lines[a].voice] - order[score.lines[b].voice]);
   const now = choices.indexOf(current.manual[sys.index]);
   const next = now < 0 ? choices[0] : choices[now + 1];
-  const { [sys.index]: _, ...rest } = current.manual;
-  setMarks(next == null ? rest : { ...rest, [sys.index]: next });
+  // The same staff can belong to two systems the reader split one row into:
+  // mark (or unmark) it in each.
+  const manual = { ...current.manual };
+  for (const c of [best, ...cands.filter((c) => c.sys !== sys && c.dy === 0 && best.dy === 0 && c.staff.key === staff.key)]) {
+    delete manual[c.sys.index];
+    if (next == null) continue;
+    const voice = score.lines[next].voice;
+    manual[c.sys.index] = c.staff.lines.find((id) => score.lines[id].voice === voice) ?? c.staff.lines[0];
+  }
+  setMarks(manual);
 }
 
 // Shades the staff you've marked in each system.

@@ -44,4 +44,6 @@ for (const sys of score.systems) {
       r.failures.push({ sys: sys.index, page: sys.page + 1, staff: st.key, y: Math.round(y), lines: st.lines, marked, shaded });
   }
 }
+r.layout = score.systems.map((y) => `p${y.page + 1} bars ${y.bars[0].number}-${y.bars.at(-1).number}: ${y.staves.map((st) => `${st.key} ${Math.round(st.y0)}-${Math.round(st.y1)}`).join(" | ")}`);
+r.parts = score.lines.map((l) => `${l.id} ${l.label} ${l.staffKey} ${l.voice}`);
 window.result = r;
