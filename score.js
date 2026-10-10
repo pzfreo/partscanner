@@ -452,6 +452,7 @@ export function buildScore(pages) {
           bar.box.y0 = Math.min(bar.box.y0, y);
           bar.box.x1 = Math.max(bar.box.x1, x);
           bar.box.y1 = Math.max(bar.box.y1, y);
+          if (n.start >= bar.length - 1e-6) continue; // past the bar: misread (dropped from playback)
           bar.onsetXs ??= new Map();
           bar.onsetXs.set(n.start, [...(bar.onsetXs.get(n.start) ?? []), x]);
         }
@@ -460,9 +461,21 @@ export function buildScore(pages) {
   });
   for (const bar of measures) {
     if (!bar.onsetXs) continue;
-    bar.onsets = [...bar.onsetXs]
-      .map(([start, xs]) => ({ t: bar.start + start, x: xs.reduce((a, b) => a + b, 0) / xs.length }))
-      .sort((a, b) => a.t - b.t);
+    // Where each onset is on the photo: the middle of its notes' positions (a
+    // misread part can't drag it), keeping the longest run of onsets that
+    // move rightwards, so the playhead never goes back within a bar.
+    const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor((xs.length - 1) / 2)];
+    const onsets = [...bar.onsetXs].map(([start, xs]) => ({ t: bar.start + start, x: median(xs) })).sort((a, b) => a.t - b.t);
+    const best = onsets.map(() => 1);
+    const prev = onsets.map(() => -1);
+    for (let i = 0; i < onsets.length; i++) {
+      for (let j = 0; j < i; j++) {
+        if (onsets[j].x < onsets[i].x && best[j] + 1 > best[i]) [best[i], prev[i]] = [best[j] + 1, j];
+      }
+    }
+    const kept = [];
+    for (let i = best.indexOf(Math.max(...best)); i >= 0; i = prev[i]) kept.unshift(onsets[i]);
+    bar.onsets = kept;
     delete bar.onsetXs;
   }
 
