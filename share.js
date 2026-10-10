@@ -278,6 +278,8 @@ export const isMobile = () => navigator.userAgentData?.mobile ?? /Android|iPhone
 // "retry" means the share sheet needs a fresh tap (browsers only allow it
 // shortly after one).
 // A link: the share sheet on phones; on desktop, copied to paste into a message.
+// Either way the song's name goes with it: link previews can't show it (the
+// score is encrypted, and what identifies it is in the #fragment).
 export async function shareLink(link, title) {
   const data = { title, text: `${title}: ${link}` };
   if (isMobile() && navigator.canShare?.(data)) {
@@ -289,7 +291,7 @@ export async function shareLink(link, title) {
       if (e.name === "NotAllowedError") return "retry";
     }
   }
-  await navigator.clipboard.writeText(link);
+  await navigator.clipboard.writeText(data.text);
   return "copied";
 }
 

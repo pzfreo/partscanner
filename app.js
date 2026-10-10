@@ -923,7 +923,7 @@ async function shareScore(id, button, status, label) {
     if (how !== "retry") prepared = null;
     if (how === "retry") say("ready", "Ready to share: tap again.", "Ready to share");
     else if (how === "cancelled") say("idle", "");
-    else if (how === "copied") say("done", "Link copied: paste it into a message.", "Link copied ✓");
+    else if (how === "copied") say("done", "Name and link copied: paste them into a message.", "Link copied ✓");
     else if (how === "downloaded") say("done", "Saved to Downloads.", "Saved ✓");
     else say("done", linked ? "Shared." : "Shared as a PDF (the link service didn't respond).", linked ? "Shared ✓" : "Shared as PDF ✓");
   } catch (e) {
