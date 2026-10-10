@@ -30,7 +30,8 @@ const tap = (y) => {
   svg.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: rc.left + 0.5 * rc.width, clientY: rc.top + (y / h) * rc.height }));
 };
 // Top and bottom staff of each system on page 1 (photo coordinates).
-for (const [top, bottom] of [[605, 1380], [1720, 2050], [2390, 2870]]) { tap(top); tap(bottom); }
+const bands = JSON.parse(new URLSearchParams(location.search).get("bands") || "[[605,1380],[1720,2050],[2390,2870]]");
+for (const [top, bottom] of bands) { tap(top); tap(bottom); }
 await sleep(200);
 r.bands = svg.querySelectorAll("rect.fix-band").length;
 r.outlines = svg.querySelectorAll("rect.fix-current").length;
@@ -41,6 +42,10 @@ await waitFor(() => !$("practice").hidden, 900000, "read again");
 await sleep(500);
 entry = await saved();
 r.after = layout(entry);
+{
+  const s = sc.buildScore(entry.pages.map(sc.parsePage));
+  r.page1 = s.systems.filter((y) => y.page === 0).map((y) => `bars ${y.bars[0].number}-${y.bars.at(-1).number} (${y.bars.map((b) => b.length).join(",")}) x ${Math.round(y.box.x0)}-${Math.round(y.box.x1)}: ${y.staves.length} staves`);
+}
 r.hints = entry.systemHints && Object.keys(entry.systemHints);
 r.otherPagesKept = entry.pages.slice(1).every((x, i) => x === r.pagesBefore[i + 1]);
 r.page1Changed = entry.pages[0] !== r.pagesBefore[0];

@@ -879,7 +879,7 @@ let prepared = null; // { id, file, link, title }
 function liveEntry(entry) {
   if (!entry || entry.id !== current?.id) return entry;
   const live = { ...entry, tempo: Number($("tempo").value), others: Number($("others").value) };
-  for (const k of ["title", "mine", "excluded", "manual", "octave", "locked", "repeats", "playRepeats"]) if (current[k] !== undefined) live[k] = current[k];
+  for (const k of ["title", "mine", "excluded", "manual", "markedStaff", "octave", "locked", "repeats", "playRepeats"]) if (current[k] !== undefined) live[k] = current[k];
   return live;
 }
 
@@ -1207,6 +1207,7 @@ function openScore(entry, nav = "push") {
   current.mine = Math.min(entry.mine ?? Math.max(0, soprano), score.lines.length - 1);
   current.excluded = entry.excluded ?? score.lines.filter((l) => l.accompaniment).map((l) => l.id);
   current.manual = entry.manual ?? {};
+  current.markedStaff = entry.markedStaff ?? {};
   repairReferences();
   current.octave = entry.octave ?? 0;
   $("octave").value = String(current.octave);
@@ -1428,9 +1429,13 @@ $("octave").onchange = () => {
   updateEntry(current.id, { octave: current.octave });
 };
 
-function setMarks(manual) {
+// markedStaff: which staff each mark was made on (system -> staff key), for
+// shading it: one line can run over two staves of a system when the reader
+// files them under one part.
+function setMarks(manual, markedStaff = {}) {
   current.manual = manual;
-  updateEntry(current.id, { manual });
+  current.markedStaff = markedStaff;
+  updateEntry(current.id, { manual, markedStaff });
   renderPartChoice();
   renderMarks();
 }
@@ -1584,17 +1589,21 @@ function toggleMark(page, e) {
   // The same staff can belong to two systems the reader split one row into:
   // mark (or unmark) it in each, starting over unless it's marked in all.
   const targets = [best, ...cands.filter((c) => c.sys !== sys && c.dy === 0 && best.dy === 0 && c.staff.key === staff.key)];
-  const everywhere = targets.every((c) => c.staff.lines.includes(current.manual[c.sys.index]));
+  const onStaff = (c) => c.staff.lines.includes(current.manual[c.sys.index]) && (current.markedStaff?.[c.sys.index] ?? c.staff.key) === c.staff.key;
+  const everywhere = targets.every(onStaff);
   const now = everywhere ? choices.indexOf(current.manual[sys.index]) : -1;
   const next = now < 0 ? choices[0] : choices[now + 1];
   const manual = { ...current.manual };
+  const markedStaff = { ...current.markedStaff };
   for (const c of targets) {
     delete manual[c.sys.index];
+    delete markedStaff[c.sys.index];
     if (next == null) continue;
     const voice = score.lines[next].voice;
     manual[c.sys.index] = c.staff.lines.find((id) => score.lines[id].voice === voice) ?? c.staff.lines[0];
+    markedStaff[c.sys.index] = c.staff.key;
   }
-  setMarks(manual);
+  setMarks(manual, markedStaff);
 }
 
 // Shades the staff you've marked in each system.
@@ -1605,22 +1614,27 @@ function renderMarks() {
     for (const [sysIndex, lineId] of Object.entries(current.manual)) {
       const sys = score.systems[sysIndex];
       const line = score.lines[lineId];
-      const staff = sys?.page === p && (sys.staves.find((st) => st.lines.includes(Number(lineId))) ?? sys.staves.find((st) => st.key === line?.staffKey));
+      const tapped = sys?.page === p && sys.staves.find((st) => st.key === current.markedStaff?.[sysIndex] && st.lines.includes(Number(lineId)));
+      const staff = tapped || (sys?.page === p && (sys.staves.find((st) => st.lines.includes(Number(lineId))) ?? sys.staves.find((st) => st.key === line?.staffKey)));
       if (!staff) continue;
       const px = view.w * 0.015;
       const py = view.h * 0.012;
+      // The staff's own outline when the reader gave one (the whole line), else
+      // the span of its notes.
+      const x0 = staff.x0 ?? sys.box.x0;
+      const x1 = staff.x1 ?? sys.box.x1;
       const rect = document.createElementNS(SVG, "rect");
       rect.setAttribute("class", "mark");
-      rect.setAttribute("x", sys.box.x0 - px);
+      rect.setAttribute("x", x0 - px);
       rect.setAttribute("y", staff.y0 - py);
-      rect.setAttribute("width", sys.box.x1 - sys.box.x0 + 2 * px);
+      rect.setAttribute("width", x1 - x0 + 2 * px);
       rect.setAttribute("height", staff.y1 - staff.y0 + 2 * py);
       rect.setAttribute("rx", view.w * 0.006);
       view.marks.append(rect);
       if (line.voice !== "only" && staff.lines.length > 1) {
         const label = document.createElementNS(SVG, "text");
         label.setAttribute("class", "mark-label");
-        label.setAttribute("x", sys.box.x1 + px - view.w * 0.005);
+        label.setAttribute("x", x1 + px - view.w * 0.005);
         label.setAttribute("y", staff.y0 - py - view.h * 0.004);
         label.setAttribute("text-anchor", "end");
         label.setAttribute("font-size", view.w * 0.03);

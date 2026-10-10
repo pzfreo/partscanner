@@ -91,7 +91,9 @@ export function parsePage(xmlText) {
         }
         maxPos = Math.max(maxPos, pos);
       }
-      return { notes, length: maxPos || timeLength, meter: timeLength, ...repeatMarks(measure) };
+      // The reader marks the first bar of each new line of music.
+      const newSystem = !!measure.querySelector('print[new-system="yes"]');
+      return { notes, length: maxPos || timeLength, meter: timeLength, newSystem, ...repeatMarks(measure) };
     });
     for (let staff = 1; staff <= staves; staff++) placeNoteheads(measures, staff);
     return { staves, measures, clef };
@@ -413,6 +415,9 @@ export function buildScore(pages) {
   let t = 0;
   pages.forEach((page, sheet) => {
     pageMeasureStart.push(measures.length);
+    // Parts that mark where lines start on this page (a part padded with empty
+    // bars until it first appears marks none there).
+    const marking = page.parts.filter((p) => p.measures.some((m) => m.newSystem));
     const count = Math.max(0, ...page.parts.map((p) => p.measures.length));
     for (let i = 0; i < count; i++) {
       // Bars with no notes (a part that sits out a system) don't set the length.
@@ -431,6 +436,9 @@ export function buildScore(pages) {
         repeatBackward: marks.some((m) => m.repeatBackward),
         endingStart: [...new Set(marks.flatMap((m) => m.endingStart))],
         endingStop: marks.some((m) => m.endingStop),
+        // At least half the marking parts agree (one read with an extra bar
+        // puts its mark late).
+        newSystem: marking.filter((p) => p.measures[i]?.newSystem).length * 2 >= Math.max(1, marking.length),
       });
       t += length;
     }
@@ -493,7 +501,9 @@ export function buildScore(pages) {
         for (const n of m.notes) {
           if (!n.box) continue;
           const key = n.staffKey ?? `${part.key}/${n.staff}`;
-          const b = seen.get(key) ?? { page: p, t, staffKey: key, y0: Infinity, y1: -Infinity };
+          const b = seen.get(key) ?? { page: p, t, staffKey: key, x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity };
+          b.x0 = Math.min(b.x0, n.box.x0);
+          b.x1 = Math.max(b.x1, n.box.x1);
           b.y0 = Math.min(b.y0, n.box.y0);
           b.y1 = Math.max(b.y1, n.box.y1);
           seen.set(key, b);
@@ -584,12 +594,20 @@ function findSystems(measures, lines, staffBoxes = []) {
   let cur = null;
   let lastBox = null;
   let lastPage = null;
+  // The reader marks where each line of music starts; scores without those
+  // marks (read before, or imported MusicXML) go by where the bars' notes are.
+  const marked = measures.some((b) => b.newSystem);
+  let lastSheet = null;
   for (const bar of measures) {
-    // A new row: a new page, back to the left, or wholly below the last bar
-    // (rows that don't start at the same x, e.g. one bar per staff).
-    const startsRow = bar.box && (bar.page !== lastPage || bar.box.x0 < lastBox.x0 || bar.box.y0 > lastBox.y1);
+    // A new row: a new page, a bar marked as starting a line, or (unmarked)
+    // back to the left or wholly below the last bar (rows that don't start at
+    // the same x, e.g. one bar per staff).
+    const startsRow = marked
+      ? bar.sheet !== lastSheet || bar.newSystem
+      : bar.box && (bar.page !== lastPage || bar.box.x0 < lastBox.x0 || bar.box.y0 > lastBox.y1);
+    lastSheet = bar.sheet;
     if (!cur || startsRow) {
-      cur = { index: systems.length, page: bar.page ?? lastPage, start: bar.start, bars: [] };
+      cur = { index: systems.length, page: bar.page ?? (marked ? bar.sheet : lastPage), start: bar.start, bars: [] };
       systems.push(cur);
     }
     cur.bars.push(bar);
@@ -618,16 +636,28 @@ function findSystems(measures, lines, staffBoxes = []) {
       }
     }
     // The staves' outlines as read, which also place staves that only rest here.
+    // A bar the reader put on another line of music would stretch a staff over
+    // several: each staff takes the outline most of the system's bars give it.
+    const boxesOf = new Map();
     for (const b of staffBoxes) {
       if (b.t < sys.start || b.t >= sys.end || b.page !== sys.page) continue;
-      const ids = linesOn.get(b.staffKey) ?? [];
+      boxesOf.set(b.staffKey, [...(boxesOf.get(b.staffKey) ?? []), b]);
+    }
+    for (const [key, boxes] of boxesOf) {
+      const ids = linesOn.get(key) ?? [];
       if (!ids.length) continue;
-      const st = staves.get(b.staffKey) ?? { key: b.staffKey, y0: Infinity, y1: -Infinity, lines: new Set() };
-      if (!st.boxed) [st.y0, st.y1, st.boxed] = [b.y0, b.y1, true];
-      st.y0 = Math.min(st.y0, b.y0);
-      st.y1 = Math.max(st.y1, b.y1);
+      const overlaps = (a, b) => a.y0 < b.y1 && b.y0 < a.y1;
+      const best = boxes.map((b) => boxes.filter((o) => overlaps(o, b))).sort((a, b) => b.length - a.length)[0];
+      const st = staves.get(key) ?? { key, y0: Infinity, y1: -Infinity, lines: new Set() };
+      Object.assign(st, {
+        y0: Math.min(...best.map((b) => b.y0)),
+        y1: Math.max(...best.map((b) => b.y1)),
+        x0: Math.min(...best.map((b) => b.x0)),
+        x1: Math.max(...best.map((b) => b.x1)),
+        boxed: true,
+      });
       for (const id of ids) st.lines.add(id);
-      staves.set(b.staffKey, st);
+      staves.set(key, st);
     }
     // A staff's second voice only counts in this system if it sings
     // something different here; otherwise it's one voice (no upper/lower).
@@ -638,6 +668,16 @@ function findSystems(measures, lines, staffBoxes = []) {
       if (ids.length === 2 && sameAs(heard(ids[0]), heard(ids[1]))) st.lines.delete(ids.find((id) => lines[id].voice === "lower") ?? ids[1]);
     }
     sys.staves = [...staves.values()].map((st) => ({ ...st, lines: [...st.lines] })).sort((a, b) => a.y0 - b.y0);
+    // A system with no placed notes (all rests) still has its staves' outlines.
+    const outlined = sys.staves.filter((st) => st.boxed);
+    if (!sys.box && outlined.length) {
+      sys.box = {
+        x0: Math.min(...outlined.map((st) => st.x0)),
+        x1: Math.max(...outlined.map((st) => st.x1)),
+        y0: Math.min(...outlined.map((st) => st.y0)),
+        y1: Math.max(...outlined.map((st) => st.y1)),
+      };
+    }
   }
   return systems;
 }
