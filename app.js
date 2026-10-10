@@ -1557,7 +1557,7 @@ $("fix-done").onclick = () => {
   endMarkup(false);
   // Read just those pages again, as Read again does (the score stays as it
   // was until the reading is done).
-  const { id, created, title, images, pages: xmls, pending: _pending, ...settings } = liveEntry(current);
+  const { id, created, title, images, pages: xmls, pending: _pending, excluded: _excluded, ...settings } = liveEntry(current);
   prepared = preparedAudio = null;
   loadScan(images, xmls.map((x, i) => (changed.includes(i) ? null : x)), id, created, title);
   scanSettings = { ...settings, systemHints: hints };
@@ -1907,7 +1907,9 @@ for (const id of ["from-bar", "to-bar", "loop"]) {
 // title and settings. It stays as it was until the new reading is saved.
 $("read-again").onclick = () => {
   if (reading) return show("scan");
-  const { id, created, title, images, pages: _pages, pending: _pending, ...settings } = liveEntry(current);
+  // Parts switched off are saved by their place in the parts list, which a new
+  // reading can change: go back to the default (the piano off).
+  const { id, created, title, images, pages: _pages, pending: _pending, excluded: _excluded, ...settings } = liveEntry(current);
   prepared = preparedAudio = null;
   loadScan(images, [], id, created, title);
   scanSettings = settings;

@@ -91,7 +91,7 @@ export function parsePage(xmlText) {
         }
         maxPos = Math.max(maxPos, pos);
       }
-      return { notes, length: maxPos || timeLength, ...repeatMarks(measure) };
+      return { notes, length: maxPos || timeLength, meter: timeLength, ...repeatMarks(measure) };
     });
     for (let staff = 1; staff <= staves; staff++) placeNoteheads(measures, staff);
     return { staves, measures, clef };
@@ -416,8 +416,13 @@ export function buildScore(pages) {
     const count = Math.max(0, ...page.parts.map((p) => p.measures.length));
     for (let i = 0; i < count; i++) {
       // Bars with no notes (a part that sits out a system) don't set the length.
-      const lengths = (all) => page.parts.map((p) => p.measures[i]).filter((m) => m && (all || m.notes.length)).map((m) => m.length);
-      const length = Math.max(0, ...lengths(false)) || Math.max(0, ...lengths(true)) || 2;
+      // A part read with too many or too long notes (often the piano) would
+      // stretch the bar for everyone: when any part fills exactly its time
+      // signature, that's the bar's length.
+      const here = page.parts.map((p) => p.measures[i]).filter(Boolean);
+      const sung = here.filter((m) => m.notes.length);
+      const fitting = sung.find((m) => Math.abs(m.length - m.meter) < 1e-6);
+      const length = fitting?.length || Math.max(0, ...sung.map((m) => m.length)) || Math.max(0, ...here.map((m) => m.length)) || 2;
       // sheet/sheetBar: which page's MusicXML, and which bar in it (for the As read view)
       const marks = page.parts.map((p) => p.measures[i]).filter(Boolean);
       measures.push({
@@ -497,7 +502,9 @@ export function buildScore(pages) {
         if (!part) return;
         part.measures.forEach((m, i) => {
           const offset = measures[pageMeasureStart[p] + i].start;
-          const split = splitStaff(m.notes.filter((n) => n.staff === staff));
+          // Notes a misread part puts past the end of the bar are dropped.
+          const barLength = measures[pageMeasureStart[p] + i].length;
+          const split = splitStaff(m.notes.filter((n) => n.staff === staff && n.start < barLength - 1e-6));
           const place = (n) => ({
             t: offset + n.start,
             dur: n.dur,
