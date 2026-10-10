@@ -21,6 +21,8 @@ let ort;
 
 const post = (msg) => self.postMessage(msg);
 const sessions = [];
+const sessionNames = []; // id -> model name
+const onGpu = new Set(); // ids of sessions created on WebGPU
 const sessionIds = new Map();
 let useGpu = false;
 
@@ -114,18 +116,29 @@ const TYPED = {
 const kept = new Map(); // handle -> ort.Tensor
 let lastKept = 0;
 
+async function newSession(id) {
+  const name = sessionNames[id];
+  const gpu = useGpu && GPU_MODELS.has(name);
+  const eps = gpu ? ["webgpu", "wasm"] : ["wasm"];
+  const t0 = performance.now();
+  const session = await ort.InferenceSession.create(await modelBytes(name), {
+    executionProviders: eps,
+    graphOptimizationLevel: "all",
+  });
+  if (gpu) onGpu.add(id);
+  else onGpu.delete(id);
+  post({ type: "log", msg: `Loaded ${name} on ${eps[0]} in ${Math.round(performance.now() - t0)} ms` });
+  return session;
+}
+
 // Called from omr/onnxruntime.py.
 self.omrOrt = {
   async create(name) {
     if (!sessionIds.has(name)) {
-      const eps = useGpu && GPU_MODELS.has(name) ? ["webgpu", "wasm"] : ["wasm"];
-      const t0 = performance.now();
-      const session = await ort.InferenceSession.create(await modelBytes(name), {
-        executionProviders: eps,
-        graphOptimizationLevel: "all",
-      });
-      post({ type: "log", msg: `Loaded ${name} on ${eps[0]} in ${Math.round(performance.now() - t0)} ms` });
-      sessionIds.set(name, sessions.push(session) - 1);
+      const id = sessions.length;
+      sessionNames[id] = name;
+      sessions[id] = await newSession(id);
+      sessionIds.set(name, id);
     }
     const s = sessions[sessionIds.get(name)];
     return { id: sessionIds.get(name), inputNames: s.inputNames, outputNames: s.outputNames };
@@ -146,7 +159,22 @@ self.omrOrt = {
         used.push(dims);
       } else inputs[name] = new ort.Tensor(type, new TYPED[type](bytes.slice().buffer), dims);
     }
-    const out = await sessions[id].run(inputs, names);
+    let out;
+    try {
+      out = await sessions[id].run(inputs, names);
+    } catch (e) {
+      // The phone's GPU can go away (e.g. under memory pressure); onnxruntime's
+      // WebGPU backend then fails every run. Carry on without the GPU.
+      if (!onGpu.has(id)) throw e;
+      post({ type: "log", msg: `WebGPU run failed (${e.message}); using WASM from now on` });
+      useGpu = false;
+      for (const other of [...onGpu]) {
+        const old = sessions[other];
+        Promise.resolve().then(() => old.release()).catch(() => {});
+        sessions[other] = await newSession(other);
+      }
+      out = await sessions[id].run(inputs, names);
+    }
     for (const h of used) kept.delete(h);
     const t = (runTimes[id] ??= { calls: 0, ms: 0 });
     t.calls++;
