@@ -519,7 +519,7 @@ export function buildScore(pages) {
 }
 
 // Groups bars into systems (one row of music on a page): a new system starts
-// on a new page or when a bar sits left of the previous one. For each system,
+// on a new page, when a bar sits left of the previous one, or below it. For each system,
 // lists its staves top to bottom with their extent on the photo and the lines
 // (voices) on each, so a tap can be mapped to a staff and voice.
 function findSystems(measures, lines) {
@@ -528,7 +528,9 @@ function findSystems(measures, lines) {
   let lastBox = null;
   let lastPage = null;
   for (const bar of measures) {
-    const startsRow = bar.box && (bar.page !== lastPage || bar.box.x0 < lastBox.x0);
+    // A new row: a new page, back to the left, or wholly below the last bar
+    // (rows that don't start at the same x, e.g. one bar per staff).
+    const startsRow = bar.box && (bar.page !== lastPage || bar.box.x0 < lastBox.x0 || bar.box.y0 > lastBox.y1);
     if (!cur || startsRow) {
       cur = { index: systems.length, page: bar.page ?? lastPage, start: bar.start, bars: [] };
       systems.push(cur);
