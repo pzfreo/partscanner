@@ -165,9 +165,10 @@ def _bar_count(symbols):
 
 # homr pairs two staves into a grand staff (piano-style) when it finds
 # brace-like ink at their left, so a stray mark can pair two choir staves.
-# A real grand staff has different clefs (treble over bass); when both halves
-# read with the same clef, read them as two staves. Each staff is read once
-# per page (cached) however often it's asked for.
+# A real grand staff (a piano) has a bass clef on its lower staff; when the
+# lower half doesn't read with one (two treble staves, or no clef read at
+# all), read them as two staves. Each staff is read once per page (cached)
+# however often it's asked for.
 from homr import model as homr_model  # noqa: E402
 
 _merge_staff = homr_model.Staff.merge
@@ -219,8 +220,8 @@ def _split_false_grand_staffs(debug, rows, image, config, page_to_input_image):
                 symbols = staff_parsing.parse_staff_image(debug, 0, staff, image, regions, config, page_to_input_image)
                 first = next((i for i, s in enumerate(symbols) if s.rhythm.startswith(("note", "rest"))), len(symbols))
                 clefs = {s.position: s.rhythm[5:6] for s in symbols[:first] if s.rhythm.startswith("clef")}
-                if clefs.get("upper") and clefs.get("upper") == clefs.get("lower"):
-                    eprint("Two staves with the same clef paired as a grand staff; reading them apart")
+                if clefs.get("lower") != "F":
+                    eprint("Two staves paired as a grand staff without a bass clef below; reading them apart")
                     staffs.extend(halves)
                     continue
             staffs.append(staff)
