@@ -86,21 +86,32 @@ self.addEventListener("fetch", (e) => {
   } else if (url.origin === location.origin && !url.pathname.includes("/models/")) {
     // no-cache: revalidate with the server so app updates show up on the next
     // load instead of after the HTTP cache (10 min on GitHub Pages) expires.
+    // Each fresh copy is also kept without its ?v=…, so the plain entry is
+    // always the newest (the copies cached at install are never refreshed).
+    const plain = new URL(url);
+    plain.search = "";
     const fresh = fetch(e.request.url, { cache: "no-cache" }).then((res) => {
       slowUntil = 0;
       if (res.ok) {
         const copy = res.clone();
-        e.waitUntil(caches.open(SHELL).then((c) => c.put(e.request, copy)));
+        const latest = res.clone();
+        e.waitUntil(
+          caches.open(SHELL).then((c) => Promise.all([c.put(e.request, copy), url.search && c.put(plain.href, latest)])),
+        );
       }
       return res;
     });
-    // The exact version the page asked for (?v=…) first, so files match.
-    const cached = async () => (await caches.match(e.request)) || caches.match(e.request, { ignoreSearch: true });
+    // The exact version the page asked for (?v=…) first, so files match;
+    // only when offline any copy (the newest, see above).
+    const exact = () => caches.match(e.request);
+    const cached = async () => (await exact()) || caches.match(plain.href);
     // On a weak connection the network can hang rather than fail: after a few
     // seconds use the cached copy (the fetch still refreshes the cache, and the
     // Update banner offers the new version).
+    // A versioned file (the app's scripts, the music reader) only from its own
+    // version: another cached version once ran an old reader with a new app.
     const wait = Date.now() < slowUntil ? 0 : NETWORK_WAIT;
-    const slow = new Promise((r) => setTimeout(r, wait)).then(cached);
+    const slow = new Promise((r) => setTimeout(r, wait)).then(url.search ? exact : cached);
     e.respondWith(
       Promise.race([
         fresh.catch(cached),
