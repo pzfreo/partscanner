@@ -97,6 +97,7 @@ window.addEventListener("popstate", (e) => {
 
 const REPORT_TO = "bugs@partsong.app";
 const VERSION = new URL(import.meta.url).searchParams.get("v") || "dev";
+$("header-version").textContent = VERSION;
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
