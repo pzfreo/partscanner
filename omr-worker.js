@@ -228,8 +228,16 @@ async function init() {
   const v = location.search;
   const homrZip = await (await fetch("vendor/homr.zip" + v)).arrayBuffer();
   pyodide.unpackArchive(homrZip, "zip", { extractDir: lib });
+  const version = new URLSearchParams(v).get("v");
   for (const f of ["onnxruntime.py", "runner.py"]) {
-    pyodide.FS.writeFile(`${lib}/${f}`, await (await fetch("omr/" + f + v)).text());
+    let text = await (await fetch("omr/" + f + v)).text();
+    // A copy cached by another version would run an old reader with this app
+    // (it happened, see sw.js): fetch it again past any cached copy, and stop
+    // with a clear message if it still isn't this version.
+    const mine = (t) => !version || f !== "runner.py" || t.includes(`VERSION = "${version}"`);
+    if (!mine(text)) text = await (await fetch(`omr/${f}${v}&fresh=${Date.now()}`, { cache: "reload" })).text();
+    if (!mine(text)) throw new Error("The music reader didn't update. Reload Partsong (twice if needed) and try again.");
+    pyodide.FS.writeFile(`${lib}/${f}`, text);
   }
   pyodide.runPython(`import sys; sys.path.insert(0, "${lib}")`);
   recognise = pyodide.pyimport("runner").recognise;

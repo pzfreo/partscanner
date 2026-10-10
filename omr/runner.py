@@ -1,5 +1,7 @@
 """Runs homr on one page image inside Pyodide and returns its MusicXML."""
 
+VERSION = "dev"  # the deploy's version, set by scripts/stamp-version.mjs
+
 import json
 import sys
 import types

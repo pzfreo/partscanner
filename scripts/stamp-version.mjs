@@ -16,6 +16,9 @@ const stamp = (file, rules) => {
   console.log(`${file}: ${n} reference(s)`);
 };
 
+// The music reader says which version it is, so the worker can tell if it was
+// handed a cached copy from another version (see omr-worker.js).
+stamp("omr/runner.py", [[/^VERSION = "dev"/m, () => `VERSION = "${version}"`]]);
 stamp("index.html", [[/(href|src)="([\w-]+\.(?:css|js))"/g, (_, attr, name) => `${attr}="${name}${v}"`]]);
 for (const file of readdirSync(dir).filter((f) => f.endsWith(".js") && f !== "sw.js")) {
   stamp(file, [
